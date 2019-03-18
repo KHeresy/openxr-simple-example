@@ -1,5 +1,7 @@
 # Simple OpenXR C Example
 
+Note: Currently this example only supports Linux/X11.
+
 This application is neither complex nor optimized for performance.
 It is intended to showcase OpenXR and how it is to be used for a simple VR application.
 
