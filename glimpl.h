@@ -30,8 +30,8 @@ initGLX(Display** xDisplay,
 
 #define XR_USE_PLATFORM_XLIB
 #define XR_USE_GRAPHICS_API_OPENGL
-#include <openxr/openxr.h>
-#include <openxr/openxr_platform.h>
+#include "openxr_headers/openxr.h"
+#include "openxr_headers/openxr_platform.h"
 
 int
 initGlImpl();
