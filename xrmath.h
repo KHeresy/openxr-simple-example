@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include <openxr/openxr.h>
+#include "openxr_headers/openxr.h"
 #include <math.h>
 #define MATH_PI 3.14159265358979323846f
 

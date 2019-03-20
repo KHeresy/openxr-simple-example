@@ -15,7 +15,7 @@
 
 #define XR_USE_PLATFORM_XLIB
 #define XR_USE_GRAPHICS_API_OPENGL
-#include <openxr/openxr.h>
+#include "openxr_headers/openxr.h"
 
 #include "xrmath.h" // math glue between OpenXR and OpenGL
 #include "glimpl.h" // factored out rendering of a simple scene
