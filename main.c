@@ -575,6 +575,10 @@ init_openxr(xr_example* self)
 
 
 	for (uint32_t i = 0; i < self->view_count; i++) {
+		for (uint32_t j = 0; j < swapchainLength[i]; j++) {
+			self->images[i][j].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
+			self->images[i][j].next = NULL;
+		}
 		result = xrEnumerateSwapchainImages(
 		    self->swapchains[i], swapchainLength[i], &swapchainLength[i],
 		    (XrSwapchainImageBaseHeader*)self->images[i]);
