@@ -230,19 +230,20 @@ renderFrame(int w,
 	glClearColor(.0f, 0.0f, 0.2f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	float cubedist = 1.5;
-	float cubescale = 0.33;
+	float cubedist = 1.5f;
+	float cubescale = 0.33f;
+	float cubeele = .5f;
 	mat4_t modelmatrix_front =
-	    m4_mul(m4_translation(vec3(0.0f, 1.6f, -cubedist)),
+	    m4_mul(m4_translation(vec3(0.0f, cubeele, -cubedist)),
 	           m4_scaling(vec3(cubescale, cubescale, cubescale)));
 	mat4_t modelmatrix_back =
-	    m4_mul(m4_translation(vec3(0.0f, 1.6f, cubedist)),
+	    m4_mul(m4_translation(vec3(0.0f, cubeele, cubedist)),
 	           m4_scaling(vec3(cubescale, cubescale, cubescale)));
 	mat4_t modelmatrix_left =
-	    m4_mul(m4_translation(vec3(-cubedist, 1.6f, 0.0f)),
+	    m4_mul(m4_translation(vec3(-cubedist, cubeele, 0.0f)),
 	           m4_scaling(vec3(cubescale, cubescale, cubescale)));
 	mat4_t modelmatrix_right =
-	    m4_mul(m4_translation(vec3(cubedist, 1.6f, 0.0f)),
+	    m4_mul(m4_translation(vec3(cubedist, cubeele, 0.0f)),
 	           m4_scaling(vec3(cubescale, cubescale, cubescale)));
 
 	double displaytimeSeconds =
