@@ -183,9 +183,9 @@ init_openxr(xr_example* self)
 	    .applicationInfo =
 	        {
 	            .applicationName = "OpenXR OpenGL Example",
-	            .engineName = "Example Engine",
-	            .applicationVersion = XR_MAKE_VERSION(1, 0, 0),
-	            .engineVersion = XR_MAKE_VERSION(1, 0, 0),
+	            .engineName = "",
+	            .applicationVersion = 1,
+	            .engineVersion = 0,
 	            .apiVersion = XR_CURRENT_API_VERSION,
 	        },
 	};
@@ -262,8 +262,6 @@ init_openxr(xr_example* self)
 		       systemProperties.graphicsProperties.maxSwapchainImageHeight);
 		printf("\tMax swapchain width : %d\n",
 		       systemProperties.graphicsProperties.maxSwapchainImageWidth);
-		printf("\tMax views           : %d\n",
-		       systemProperties.graphicsProperties.maxViewCount);
 		printf("\tOrientation Tracking: %d\n",
 		       systemProperties.trackingProperties.orientationTracking);
 		printf("\tPosition Tracking   : %d\n",
@@ -379,7 +377,7 @@ init_openxr(xr_example* self)
 		               "Failed to get OpenGL graphics requirements!"))
 			return 1;
 
-		uint32_t desired_opengl_version = XR_MAKE_VERSION(4, 5, 0);
+		XrVersion desired_opengl_version = XR_MAKE_VERSION(4, 5, 0);
 		if (desired_opengl_version > opengl_reqs.maxApiVersionSupported ||
 		    desired_opengl_version < opengl_reqs.minApiVersionSupported) {
 			printf(
