@@ -158,7 +158,6 @@ init_openxr(xr_example* self)
 	}
 	xrEnumerateApiLayerProperties(apiLayerCount, &apiLayerCount,
 	                              apiLayerProperties);
-
 	for (uint32_t i = 0; i < apiLayerCount; i++) {
 		if (strcmp(apiLayerProperties[i].layerName,
 		           "XR_APILAYER_LUNARG_api_dump") == 0) {
@@ -859,7 +858,9 @@ int
 main()
 {
 	xr_example self;
-	init_openxr(&self);
+	int ret = init_openxr(&self);
+	if (ret != 0)
+		return ret;
 	main_loop(&self);
 	cleanup(&self);
 	return 0;
