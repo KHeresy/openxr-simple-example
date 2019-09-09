@@ -8,8 +8,8 @@ INCLUDE(FindPkgConfig)
 PKG_SEARCH_MODULE(SDL2 REQUIRED sdl2)
 
 # uncomment to use an openxr/build directory that is next to the openxr-example directory
-#include_directories("${CMAKE_SOURCE_DIR}/../openxr/build/include/" ${SDL2_INCLUDE_DIR})
-#link_directories("${CMAKE_SOURCE_DIR}/../openxr/build/src/loader/")
+include_directories("${CMAKE_SOURCE_DIR}/../OpenXR-SDK/include/" ${SDL2_INCLUDE_DIR})
+link_directories("${CMAKE_SOURCE_DIR}/../OpenXR-SDK/build/src/loader/")
 
 add_executable(openxr-example main.c glimpl.c)
 
