@@ -632,6 +632,125 @@ main_loop(xr_example* self)
 
 	XrResult result;
 
+
+	XrActionSetCreateInfo exampleSetInfo = {
+		.type = XR_TYPE_ACTION_SET_CREATE_INFO,
+		.next = NULL,
+		.priority = 0
+	};
+	strcpy(exampleSetInfo.actionSetName, "exampleset");
+	strcpy(exampleSetInfo.localizedActionSetName, "Example Action Set");
+
+	XrActionSet exampleSet;
+	result = xrCreateActionSet(self->instance, &exampleSetInfo, &exampleSet);
+	if (!xr_result(self->instance, result, "failed to create actionset"))
+		return;
+
+	int hands = 2;
+	XrPath handPaths[hands];
+	xrStringToPath(self->instance, "/user/hand/left", &handPaths[0]);
+	xrStringToPath(self->instance, "/user/hand/right", &handPaths[1]);
+
+	XrActionCreateInfo actionInfo = {
+		.type = XR_TYPE_ACTION_CREATE_INFO,
+		.next = NULL,
+		.actionType = XR_ACTION_TYPE_FLOAT_INPUT,
+		.countSubactionPaths = hands,
+		.subactionPaths = handPaths
+	};
+	// assuming every controller has some form of main "trigger" button
+	strcpy(actionInfo.actionName, "triggergrab");
+	strcpy(actionInfo.localizedActionName, "Grab Object with Trigger Button");
+
+	XrAction grabAction;
+	result = xrCreateAction(exampleSet, &actionInfo, &grabAction);
+	if (!xr_result(self->instance, result, "failed to create grab action"))
+		return;
+
+	actionInfo.actionType = XR_ACTION_TYPE_POSE_INPUT;
+	strcpy(actionInfo.actionName, "handpose");
+	strcpy(actionInfo.localizedActionName, "Hand Pose");
+	actionInfo.countSubactionPaths = hands;
+	actionInfo.subactionPaths = handPaths;
+
+	XrAction poseAction;
+	result = xrCreateAction(exampleSet, &actionInfo, &poseAction);
+	if (!xr_result(self->instance, result, "failed to create pose action"))
+		return;
+
+	XrPath grabInputPath[hands];
+	xrStringToPath(self->instance, "/user/hand/left/input/select/click", &grabInputPath[0]);
+	xrStringToPath(self->instance, "/user/hand/right/input/select/click", &grabInputPath[1]);
+
+	XrPath poseInputPath[hands];
+	xrStringToPath(self->instance, "/user/hand/left/input/grip/pose", &poseInputPath[0]);
+	xrStringToPath(self->instance, "/user/hand/right/input/grip/pose", &poseInputPath[1]);
+
+	XrPath khrSimpleInteractionProfilePath;
+	result = xrStringToPath(self->instance, "/interaction_profiles/khr/simple_controller", &khrSimpleInteractionProfilePath);
+	if (!xr_result(self->instance, result, "failed to get interaction profile"))
+		return;
+
+	 const XrActionSuggestedBinding bindings[4] = {
+		{
+			.action = poseAction,
+			.binding = poseInputPath[0]
+		},
+		{
+			.action = poseAction,
+			.binding = poseInputPath[1]
+		},
+		{
+			.action = grabAction,
+			.binding = grabInputPath[0]
+		},
+		{
+			.action = grabAction,
+			.binding = grabInputPath[1]
+		}
+	};
+
+	const XrInteractionProfileSuggestedBinding suggestedBindings = {
+		.type = XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING,
+		.next = NULL,
+		.interactionProfile = khrSimpleInteractionProfilePath,
+		.countSuggestedBindings = 4,
+		.suggestedBindings = bindings
+	};
+
+	xrSuggestInteractionProfileBindings(self->instance, &suggestedBindings);
+	if (!xr_result(self->instance, result, "failed to suggest bindings"))
+		return;
+
+	XrActionSpaceCreateInfo actionSpaceInfo = {
+		.type = XR_TYPE_ACTION_SPACE_CREATE_INFO,
+		.next = NULL,
+		.action = poseAction,
+		.poseInActionSpace.orientation.w = 1.f,
+		.subactionPath = handPaths[0]
+	};
+
+	XrSpace handSpaces[hands];
+	result = xrCreateActionSpace(self->session, &actionSpaceInfo, &handSpaces[0]);
+	if (!xr_result(self->instance, result, "failed to create left hand pose space"))
+		return;
+
+	actionSpaceInfo.subactionPath = handPaths[1];
+	result = xrCreateActionSpace(self->session, &actionSpaceInfo, &handSpaces[1]);
+	if (!xr_result(self->instance, result, "failed to create right hand pose space"))
+		return;
+
+	XrSessionActionSetsAttachInfo attachInfo = {
+		.type = XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO,
+		.next = NULL,
+		.countActionSets = 1,
+		.actionSets = &exampleSet
+	};
+	result = xrAttachSessionActionSets(self->session, &attachInfo);
+	if (!xr_result(self->instance, result, "failed to attach action set"))
+		return;
+
+
 	while (running) {
 
 		// --- Wait for our turn to render a frame
@@ -752,6 +871,66 @@ main_loop(xr_example* self)
 		if (!xr_result(self->instance, result, "failed to begin frame!"))
 			break;
 
+		const XrActiveActionSet activeActionSet = {
+			.actionSet = exampleSet,
+			.subactionPath = XR_NULL_PATH
+		};
+
+		XrActionsSyncInfo syncInfo = {
+			.type = XR_TYPE_ACTIONS_SYNC_INFO,
+			.countActiveActionSets = 1,
+			.activeActionSets = &activeActionSet
+		};
+		result = xrSyncActions(self->session, &syncInfo);
+		xr_result(self->instance, result, "failed to sync actions!");
+
+		XrActionStateGetInfo getInfo = {
+			.type = XR_TYPE_ACTION_STATE_GET_INFO,
+			.next = NULL,
+			.action = grabAction,
+			.subactionPath = handPaths[0]
+		};
+
+		XrActionStateFloat grabValue = {
+			.type = XR_TYPE_ACTION_STATE_FLOAT,
+			.next = NULL
+		};
+		result = xrGetActionStateFloat(self->session, &getInfo, &grabValue);
+		xr_result(self->instance, result, "failed to get grab value!");
+
+		getInfo.action = poseAction;
+		XrActionStatePose poseState = {
+			.type = XR_TYPE_ACTION_STATE_POSE,
+			.next = NULL
+		};
+		result = xrGetActionStatePose(self->session, &getInfo, &poseState);
+		xr_result(self->instance, result, "failed to get pose value!");
+
+		//printf("Hand poses active: %d\n", poseState.isActive);
+		//printf("Grab active %d, current %f, changed %d\n", grabValue.isActive, grabValue.currentState, grabValue.changedSinceLastSync);
+
+		XrSpaceLocation spaceLocation[hands];
+		bool spaceLocationValid[hands];
+		for (int i = 0; i < hands; i++) {
+			spaceLocation[i].type = XR_TYPE_SPACE_LOCATION;
+			spaceLocation[i].next = NULL;
+
+			result = xrLocateSpace(handSpaces[i], self->local_space, frameState.predictedDisplayTime, &spaceLocation[i]);
+			xr_result(self->instance, result, "failed to locate space %d!", i);
+			spaceLocationValid[i] =
+				//(spaceLocation[i].locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 &&
+				(spaceLocation[i].locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0;
+		};
+
+		/*
+		printf("Left Pose: %f %f %f %f, %f %f %f\n",
+			   spaceLocation[0].pose.orientation.x, spaceLocation[0].pose.orientation.y,
+			   spaceLocation[0].pose.orientation.z, spaceLocation[0].pose.orientation.w,
+			   spaceLocation[0].pose.position.x, spaceLocation[0].pose.position.y,
+			   spaceLocation[0].pose.position.z
+  			);
+		*/
+
 		XrCompositionLayerProjectionView projection_views[self->view_count];
 
 		// render each eye and fill projection_views with the result
@@ -803,10 +982,9 @@ main_loop(xr_example* self)
 			projection_views[i].subImage.imageRect.extent.height =
 			    self->configuration_views[i].recommendedImageRectHeight;
 
-			// TODO: add left and right hand pose
 			renderFrame(self->configuration_views[i].recommendedImageRectWidth,
 			            self->configuration_views[i].recommendedImageRectHeight,
-			            projectionMatrix, inverseViewMatrix, NULL, NULL,
+			            projectionMatrix, inverseViewMatrix, &spaceLocation[0], &spaceLocation[1],
 			            self->framebuffers[i][bufferIndex], self->depthbuffer,
 			            self->images[i][bufferIndex], i,
 			            frameState.predictedDisplayTime);
