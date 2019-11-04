@@ -323,9 +323,9 @@ renderFrame(int w,
 		                        (GLint)h / 2, // dstY1
 		                        (GLbitfield)GL_COLOR_BUFFER_BIT, // mask
 		                        (GLenum)GL_LINEAR);              // filter
-	}
 
-	SDL_GL_SwapWindow(mainwindow);
+		SDL_GL_SwapWindow(mainwindow);
+	}
 }
 
 void

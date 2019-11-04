@@ -991,6 +991,7 @@ main_loop(xr_example* self)
 			            self->framebuffers[i][bufferIndex], self->depthbuffer,
 			            self->images[i][bufferIndex], i,
 			            frameState.predictedDisplayTime);
+			glFinish();
 			XrSwapchainImageReleaseInfo swapchainImageReleaseInfo = {
 			    .type = XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO, .next = NULL};
 			result = xrReleaseSwapchainImage(self->swapchains[i],
