@@ -681,13 +681,13 @@ main_loop(xr_example* self)
 	if (!xr_result(self->instance, result, "failed to create pose action"))
 		return;
 
-	XrPath grabInputPath[hands];
-	xrStringToPath(self->instance, "/user/hand/left/input/select/click", &grabInputPath[0]);
-	xrStringToPath(self->instance, "/user/hand/right/input/select/click", &grabInputPath[1]);
+	XrPath selectClickPath[hands];
+	xrStringToPath(self->instance, "/user/hand/left/input/select/click", &selectClickPath[0]);
+	xrStringToPath(self->instance, "/user/hand/right/input/select/click", &selectClickPath[1]);
 
-	XrPath poseInputPath[hands];
-	xrStringToPath(self->instance, "/user/hand/left/input/grip/pose", &poseInputPath[0]);
-	xrStringToPath(self->instance, "/user/hand/right/input/grip/pose", &poseInputPath[1]);
+	XrPath posePath[hands];
+	xrStringToPath(self->instance, "/user/hand/left/input/grip/pose", &posePath[0]);
+	xrStringToPath(self->instance, "/user/hand/right/input/grip/pose", &posePath[1]);
 
 	XrPath khrSimpleInteractionProfilePath;
 	result = xrStringToPath(self->instance, "/interaction_profiles/khr/simple_controller", &khrSimpleInteractionProfilePath);
@@ -697,19 +697,19 @@ main_loop(xr_example* self)
 	 const XrActionSuggestedBinding bindings[4] = {
 		{
 			.action = poseAction,
-			.binding = poseInputPath[0]
+			.binding = posePath[0]
 		},
 		{
 			.action = poseAction,
-			.binding = poseInputPath[1]
+			.binding = posePath[1]
 		},
 		{
 			.action = grabAction,
-			.binding = grabInputPath[0]
+			.binding = selectClickPath[0]
 		},
 		{
 			.action = grabAction,
-			.binding = grabInputPath[1]
+			.binding = selectClickPath[1]
 		}
 	};
 
