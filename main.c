@@ -874,18 +874,15 @@ main_loop(xr_example* self)
 		if (!xr_result(self->instance, result, "failed to begin frame!"))
 			break;
 
-
-
-		XrActiveActionSet activeActionSets[hands];
-		for (int i = 0; i < hands; i++) {
-			activeActionSets[i].actionSet = exampleSet;
-			activeActionSets[i].subactionPath = handPaths[i];
+		const XrActiveActionSet activeActionSet = {
+			.actionSet = exampleSet,
+			.subactionPath = XR_NULL_PATH
 		};
 
 		XrActionsSyncInfo syncInfo = {
 			.type = XR_TYPE_ACTIONS_SYNC_INFO,
-			.countActiveActionSets = hands,
-			.activeActionSets = activeActionSets
+			.countActiveActionSets = 1,
+			.activeActionSets = &activeActionSet
 		};
 		result = xrSyncActions(self->session, &syncInfo);
 		xr_result(self->instance, result, "failed to sync actions!");
