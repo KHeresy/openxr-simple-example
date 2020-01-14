@@ -769,6 +769,7 @@ main_loop(xr_example* self)
 		// we do this right after xrWaitFrame() so we can go idle or
 		// break out of the main render loop as early as possible into
 		// the frame and don't have to uselessly render or submit one
+		bool isStopping = false;
 		XrResult pollResult = xrPollEvent(self->instance, &runtimeEvent);
 		if (pollResult == XR_SUCCESS) {
 			switch (runtimeEvent.type) {
@@ -795,8 +796,8 @@ main_loop(xr_example* self)
 				isVisible = event->state <= XR_SESSION_STATE_FOCUSED;
 				printf("to %d. Visible: %d", state, isVisible);
 				if (event->state >= XR_SESSION_STATE_STOPPING) {
-					printf("Abort Mission!");
-					running = false;
+					printf("\nSession is in state stopping...");
+					isStopping = true;
 				}
 				printf("\n");
 				break;
@@ -838,13 +839,25 @@ main_loop(xr_example* self)
 			printf("Failed to poll events!\n");
 			break;
 		}
+
+		if (isStopping) {
+			printf("Ending session...\n");
+			xrEndSession(self->session);
+			break;
+		}
+
 		if (!isVisible) {
 			continue;
 		}
 
 		// --- Poll SDL for events so we can exit with esc
+		bool request_exit = false;
 		while (SDL_PollEvent(&sdlEvent)) {
-			sdl_handle_events(sdlEvent, &running);
+			sdl_handle_events(sdlEvent, &request_exit);
+		}
+		if (request_exit) {
+			printf("Requesting exit...\n");
+			xrRequestExitSession(self->session);
 		}
 
 		// --- Create projection matrices and view matrices for each eye
@@ -1019,11 +1032,11 @@ main_loop(xr_example* self)
 }
 
 void
-sdl_handle_events(SDL_Event event, bool* running)
+sdl_handle_events(SDL_Event event, bool* request_exit)
 {
 	if (event.type == SDL_QUIT ||
 	    (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) {
-		*running = false;
+		*request_exit = true;
 	}
 }
 
