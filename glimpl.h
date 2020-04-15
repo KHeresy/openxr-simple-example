@@ -52,7 +52,7 @@ renderFrame(int w,
 void
 genFramebuffers(int count, GLuint* framebuffers);
 
-GLuint shaderProgramID;
-GLuint VAOs[1];
+extern GLuint shaderProgramID;
+extern GLuint VAOs[1];
 
 #endif

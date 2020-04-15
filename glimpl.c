@@ -23,6 +23,9 @@
 
 #include "glimpl.h"
 
+GLuint shaderProgramID = 0;
+GLuint VAOs[1] = {0};
+
 static const char* vertexshader =
     "#version 450 core\n"
     "layout(location = 0) in vec3 aPos;\n"
