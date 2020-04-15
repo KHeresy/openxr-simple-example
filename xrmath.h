@@ -42,7 +42,7 @@ typedef enum
 //              "Tightening the Precision of Perspective Rendering"
 //              Paul Upchurch, Mathieu Desbrun
 //              Journal of Graphics Tools, Volume 16, Issue 1, 2012
-static void
+inline static void
 XrMatrix4x4f_CreateProjection(XrMatrix4x4f* result,
                               GraphicsAPI graphicsApi,
                               const float tanAngleLeft,
@@ -114,7 +114,7 @@ XrMatrix4x4f_CreateProjection(XrMatrix4x4f* result,
 }
 
 // Creates a projection matrix based on the specified FOV.
-static void
+inline static void
 XrMatrix4x4f_CreateProjectionFov(XrMatrix4x4f* result,
                                  GraphicsAPI graphicsApi,
                                  const XrFovf fov,
@@ -132,7 +132,7 @@ XrMatrix4x4f_CreateProjectionFov(XrMatrix4x4f* result,
 }
 
 // Creates a translation matrix.
-static void
+inline static void
 XrMatrix4x4f_CreateTranslation(XrMatrix4x4f* result,
                                const float x,
                                const float y,
@@ -157,7 +157,7 @@ XrMatrix4x4f_CreateTranslation(XrMatrix4x4f* result,
 }
 
 // Use left-multiplication to accumulate transformations.
-static void
+inline static void
 XrMatrix4x4f_Multiply(XrMatrix4x4f* result,
                       const XrMatrix4x4f* a,
                       const XrMatrix4x4f* b)
@@ -202,7 +202,7 @@ XrMatrix4x4f_Multiply(XrMatrix4x4f* result,
 // Creates a rotation matrix.
 // If -Z=forward, +Y=up, +X=right, then degreesX=pitch, degreesY=yaw,
 // degreesZ=roll.
-static void
+inline static void
 XrMatrix4x4f_CreateRotation(XrMatrix4x4f* result,
                             const float degreesX,
                             const float degreesY,
@@ -226,7 +226,7 @@ XrMatrix4x4f_CreateRotation(XrMatrix4x4f* result,
 }
 
 // Creates a scale matrix.
-static void
+inline static void
 XrMatrix4x4f_CreateScale(XrMatrix4x4f* result,
                          const float x,
                          const float y,
@@ -251,7 +251,7 @@ XrMatrix4x4f_CreateScale(XrMatrix4x4f* result,
 }
 
 // Creates a matrix from a quaternion.
-static void
+inline static void
 XrMatrix4x4f_CreateFromQuaternion(XrMatrix4x4f* result,
                                   const XrQuaternionf* quat)
 {
@@ -292,7 +292,7 @@ XrMatrix4x4f_CreateFromQuaternion(XrMatrix4x4f* result,
 }
 
 // Calculates the inverse of a rigid body transform.
-static void
+inline static void
 XrMatrix4x4f_InvertRigidBody(XrMatrix4x4f* result, const XrMatrix4x4f* src)
 {
 	result->m[0] = src->m[0];
@@ -320,7 +320,7 @@ XrMatrix4x4f_InvertRigidBody(XrMatrix4x4f* result, const XrMatrix4x4f* src)
 // Use this function for the view matrix of a HMD because when you move the
 // world in the opposite direction of the HMD movement, you want to first move
 // it, then rotate it around the HMD
-static void
+inline static void
 XrMatrix4x4f_CreateTranslationRotationScaleOrbit(XrMatrix4x4f* result,
                                                  const XrVector3f* translation,
                                                  const XrQuaternionf* rotation,
@@ -346,7 +346,7 @@ XrMatrix4x4f_CreateTranslationRotationScaleOrbit(XrMatrix4x4f* result,
 // Use this function for the model matrix of objects in the world because you
 // want to first rotate objects around their origin, and then move them to where
 // they should appear
-static void
+inline static void
 XrMatrix4x4f_CreateTranslationRotationScaleRotate(XrMatrix4x4f* result,
                                                   const XrVector3f* translation,
                                                   const XrQuaternionf* rotation,
@@ -369,7 +369,7 @@ XrMatrix4x4f_CreateTranslationRotationScaleRotate(XrMatrix4x4f* result,
 }
 
 
-static void
+inline static void
 printXrMatrix4x4(XrMatrix4x4f matrix)
 {
 	printf(
