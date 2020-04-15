@@ -365,9 +365,10 @@ init_openxr(xr_example* self)
 		       self->configuration_views[0].maxSwapchainSampleCount);
 	}
 
-	// Checking if the runtime supports the Graphics API we want to use is
-	// optional! For OpenGL this is not too useful because all versions should
-	// work. Other APIs have more useful requirements.
+	// For all graphics APIs, it's required to make the
+	// "xrGet...GraphicsRequirements" call before creating a session. The
+	// information retrieved by the OpenGL version of this call isn't very useful.
+	// Other APIs have more useful requirements.
 	{
 		XrGraphicsRequirementsOpenGLKHR opengl_reqs = {
 		    .type = XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR, .next = NULL};
