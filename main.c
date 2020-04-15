@@ -870,10 +870,12 @@ main_loop(xr_example* self)
 		}
 
 		// --- Create projection matrices and view matrices for each eye
-		XrViewLocateInfo viewLocateInfo = {.type = XR_TYPE_VIEW_LOCATE_INFO,
-		                                   .displayTime =
-		                                       frameState.predictedDisplayTime,
-		                                   .space = self->local_space};
+		XrViewLocateInfo viewLocateInfo = {
+		    .type = XR_TYPE_VIEW_LOCATE_INFO,
+		    .next = NULL,
+		    .viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
+		    .displayTime = frameState.predictedDisplayTime,
+		    .space = self->local_space};
 
 		XrView views[self->view_count];
 		for (uint32_t i = 0; i < self->view_count; i++) {
