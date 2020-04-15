@@ -615,8 +615,6 @@ init_openxr(xr_example* self)
 void
 main_loop(xr_example* self)
 {
-	XrEventDataBuffer runtimeEvent = {.type = XR_TYPE_EVENT_DATA_BUFFER,
-	                                  .next = NULL};
 
 	SDL_Event sdlEvent;
 
@@ -771,6 +769,9 @@ main_loop(xr_example* self)
 		// break out of the main render loop as early as possible into
 		// the frame and don't have to uselessly render or submit one
 		//! @todo Loop until all events are handled
+
+		XrEventDataBuffer runtimeEvent = {.type = XR_TYPE_EVENT_DATA_BUFFER,
+		                                  .next = NULL};
 		bool isStopping = false;
 		XrResult pollResult = xrPollEvent(self->instance, &runtimeEvent);
 		if (pollResult == XR_SUCCESS) {
