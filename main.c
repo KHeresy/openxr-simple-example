@@ -759,19 +759,11 @@ main_loop(xr_example* self)
 
 	while (running) {
 
-		// --- Wait for our turn to render a frame
-		XrFrameState frameState = {.type = XR_TYPE_FRAME_STATE, .next = NULL};
-		XrFrameWaitInfo frameWaitInfo = {.type = XR_TYPE_FRAME_WAIT_INFO,
-		                                 .next = NULL};
-		result = xrWaitFrame(self->session, &frameWaitInfo, &frameState);
-		if (!xr_result(self->instance, result,
-		               "xrWaitFrame() was not successful, exiting..."))
-			break;
-
 		// --- Handle runtime Events
-		// we do this right after xrWaitFrame() so we can go idle or
-		// break out of the main render loop as early as possible into
-		// the frame and don't have to uselessly render or submit one
+		// we do this before xrWaitFrame() so we can go idle or
+		// break out of the main render loop as early as possible and don't have to
+		// uselessly render or submit one. Calling xrWaitFrame commits you to
+		// calling xrBeginFrame eventually.
 		//! @todo Loop until all events are handled
 
 		XrEventDataBuffer runtimeEvent = {.type = XR_TYPE_EVENT_DATA_BUFFER,
@@ -874,6 +866,16 @@ main_loop(xr_example* self)
 			xrRequestExitSession(self->session);
 		}
 
+		// --- Wait for our turn to do head-pose dependent computation and render a
+		// frame
+		XrFrameState frameState = {.type = XR_TYPE_FRAME_STATE, .next = NULL};
+		XrFrameWaitInfo frameWaitInfo = {.type = XR_TYPE_FRAME_WAIT_INFO,
+		                                 .next = NULL};
+		result = xrWaitFrame(self->session, &frameWaitInfo, &frameState);
+		if (!xr_result(self->instance, result,
+		               "xrWaitFrame() was not successful, exiting..."))
+			break;
+
 		// --- Create projection matrices and view matrices for each eye
 		XrViewLocateInfo viewLocateInfo = {
 		    .type = XR_TYPE_VIEW_LOCATE_INFO,
@@ -895,23 +897,16 @@ main_loop(xr_example* self)
 		if (!xr_result(self->instance, result, "Could not locate views"))
 			break;
 
-		// --- Begin frame
-		XrFrameBeginInfo frameBeginInfo = {.type = XR_TYPE_FRAME_BEGIN_INFO,
-		                                   .next = NULL};
-
-		result = xrBeginFrame(self->session, &frameBeginInfo);
-		if (!xr_result(self->instance, result, "failed to begin frame!"))
-			break;
-
+		//! @todo Move this action processing to before xrWaitFrame, probably.
 		const XrActiveActionSet activeActionSet = {
-			.actionSet = exampleSet,
-			.subactionPath = XR_NULL_PATH
+		    .actionSet = exampleSet,
+		    .subactionPath = XR_NULL_PATH,
 		};
 
 		XrActionsSyncInfo syncInfo = {
-			.type = XR_TYPE_ACTIONS_SYNC_INFO,
-			.countActiveActionSets = 1,
-			.activeActionSets = &activeActionSet
+		    .type = XR_TYPE_ACTIONS_SYNC_INFO,
+		    .countActiveActionSets = 1,
+		    .activeActionSets = &activeActionSet,
 		};
 		result = xrSyncActions(self->session, &syncInfo);
 		xr_result(self->instance, result, "failed to sync actions!");
@@ -962,6 +957,15 @@ main_loop(xr_example* self)
 			   spaceLocation[0].pose.position.z
   			);
 		*/
+
+
+		// --- Begin frame
+		XrFrameBeginInfo frameBeginInfo = {.type = XR_TYPE_FRAME_BEGIN_INFO,
+		                                   .next = NULL};
+
+		result = xrBeginFrame(self->session, &frameBeginInfo);
+		if (!xr_result(self->instance, result, "failed to begin frame!"))
+			break;
 
 		XrCompositionLayerProjectionView projection_views[self->view_count];
 
