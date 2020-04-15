@@ -279,8 +279,6 @@ init_openxr(xr_example* self)
 	printf("Runtime supports %d view configurations\n", viewConfigurationCount);
 
 	XrViewConfigurationType viewConfigurations[viewConfigurationCount];
-	for (uint32_t i = 0; i < viewConfigurationCount; ++i)
-		viewConfigurations[i] = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
 	result = xrEnumerateViewConfigurations(
 	    self->instance, systemId, viewConfigurationCount, &viewConfigurationCount,
 	    viewConfigurations);
