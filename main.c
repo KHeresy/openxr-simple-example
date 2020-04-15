@@ -770,20 +770,24 @@ main_loop(xr_example* self)
 		// we do this right after xrWaitFrame() so we can go idle or
 		// break out of the main render loop as early as possible into
 		// the frame and don't have to uselessly render or submit one
+		//! @todo Loop until all events are handled
 		bool isStopping = false;
 		XrResult pollResult = xrPollEvent(self->instance, &runtimeEvent);
 		if (pollResult == XR_SUCCESS) {
 			switch (runtimeEvent.type) {
 			case XR_TYPE_EVENT_DATA_EVENTS_LOST: {
-				printf("EVENT: events data lost!\n");
 				XrEventDataEventsLost* event = (XrEventDataEventsLost*)&runtimeEvent;
-				// do we care if the runtmime loses events?
+				printf("EVENT: %d events data lost!\n", event->lostEventCount);
+				// do we care if the runtime loses events?
 				break;
 			}
 			case XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING: {
-				printf("EVENT: instance loss pending!\n");
 				XrEventDataInstanceLossPending* event =
 				    (XrEventDataInstanceLossPending*)&runtimeEvent;
+				printf("EVENT: instance loss pending at %lu! Destroying instance.\n",
+				       event->lossTime);
+				// Handling this: spec says destroy instance
+				// (can optionally recreate it)
 				running = false;
 				break;
 			}
@@ -804,9 +808,10 @@ main_loop(xr_example* self)
 				break;
 			}
 			case XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING: {
-				printf("EVENT: reference space change pengind!\n");
+				printf("EVENT: reference space change pending!\n");
 				XrEventDataReferenceSpaceChangePending* event =
 				    (XrEventDataReferenceSpaceChangePending*)&runtimeEvent;
+				(void)event;
 				// TODO: do something
 				break;
 			}
@@ -814,6 +819,7 @@ main_loop(xr_example* self)
 				printf("EVENT: interaction profile changed!\n");
 				XrEventDataInteractionProfileChanged* event =
 				    (XrEventDataInteractionProfileChanged*)&runtimeEvent;
+				(void)event;
 				// TODO: do something
 				break;
 			}
@@ -822,6 +828,7 @@ main_loop(xr_example* self)
 				printf("EVENT: visibility mask changed!!\n");
 				XrEventDataVisibilityMaskChangedKHR* event =
 				    (XrEventDataVisibilityMaskChangedKHR*)&runtimeEvent;
+				(void)event;
 				// this event is from an extension
 				break;
 			}
@@ -829,6 +836,7 @@ main_loop(xr_example* self)
 				printf("EVENT: perf settings!\n");
 				XrEventDataPerfSettingsEXT* event =
 				    (XrEventDataPerfSettingsEXT*)&runtimeEvent;
+				(void)event;
 				// this event is from an extension
 				break;
 			}
