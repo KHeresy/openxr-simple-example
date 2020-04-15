@@ -465,13 +465,19 @@ init_openxr(xr_example* self)
 		printf("Runtime supports %d reference spaces: ", referenceSpacesCount);
 		for (uint32_t i = 0; i < referenceSpacesCount; i++) {
 			if (referenceSpaces[i] == XR_REFERENCE_SPACE_TYPE_LOCAL) {
-				printf("/space/local%s", i == referenceSpacesCount - 1 ? "\n" : ", ");
+				printf("XR_REFERENCE_SPACE_TYPE_LOCAL%s",
+				       i == referenceSpacesCount - 1 ? "\n" : ", ");
 				localSpaceSupported = true;
 			} else if (referenceSpaces[i] == XR_REFERENCE_SPACE_TYPE_STAGE) {
-				printf("/space/stage%s", i == referenceSpacesCount - 1 ? "\n" : ", ");
+				printf("XR_REFERENCE_SPACE_TYPE_STAGE%s",
+				       i == referenceSpacesCount - 1 ? "\n" : ", ");
 				stageSpaceSupported = true;
 			} else if (referenceSpaces[i] == XR_REFERENCE_SPACE_TYPE_VIEW) {
-				printf("/user/head%s", i == referenceSpacesCount - 1 ? "\n" : ", ");
+				printf("XR_REFERENCE_SPACE_TYPE_VIEW%s",
+				       i == referenceSpacesCount - 1 ? "\n" : ", ");
+			} else {
+				printf("some other space with type %u%s", referenceSpaces[i],
+				       i == referenceSpacesCount - 1 ? "\n" : ", ");
 			}
 		}
 
