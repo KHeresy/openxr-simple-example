@@ -684,6 +684,23 @@ main_loop(xr_example* self)
 	if (!xr_result(self->instance, result, "failed to create pose action"))
 		return;
 
+
+	XrAction hapticAction;
+	{
+		XrActionCreateInfo actionInfo = {
+			.type = XR_TYPE_ACTION_CREATE_INFO,
+			.next = NULL,
+			.actionType = XR_ACTION_TYPE_VIBRATION_OUTPUT,
+			.countSubactionPaths = hands,
+			.subactionPaths = handPaths
+		};
+		strcpy(actionInfo.actionName, "haptic");
+		strcpy(actionInfo.localizedActionName, "Haptic Vibration");
+		result = xrCreateAction(exampleSet, &actionInfo, &hapticAction);
+		if (!xr_result(self->instance, result, "failed to create haptic action"))
+			return;
+	}
+
 	XrPath selectClickPath[hands];
 	xrStringToPath(self->instance, "/user/hand/left/input/select/click", &selectClickPath[0]);
 	xrStringToPath(self->instance, "/user/hand/right/input/select/click", &selectClickPath[1]);
@@ -692,12 +709,16 @@ main_loop(xr_example* self)
 	xrStringToPath(self->instance, "/user/hand/left/input/grip/pose", &posePath[0]);
 	xrStringToPath(self->instance, "/user/hand/right/input/grip/pose", &posePath[1]);
 
+	XrPath hapticPath[hands];
+	xrStringToPath(self->instance, "/user/hand/left/output/haptic", &hapticPath[0]);
+	xrStringToPath(self->instance, "/user/hand/right/output/haptic", &hapticPath[1]);
+
 	XrPath khrSimpleInteractionProfilePath;
 	result = xrStringToPath(self->instance, "/interaction_profiles/khr/simple_controller", &khrSimpleInteractionProfilePath);
 	if (!xr_result(self->instance, result, "failed to get interaction profile"))
 		return;
 
-	 const XrActionSuggestedBinding bindings[4] = {
+	 const XrActionSuggestedBinding bindings[6] = {
 		{
 			.action = poseAction,
 			.binding = posePath[0]
@@ -713,14 +734,22 @@ main_loop(xr_example* self)
 		{
 			.action = grabAction,
 			.binding = selectClickPath[1]
-		}
+		},
+		{
+			.action = hapticAction,
+			.binding = hapticPath[0]
+		},
+		{
+			.action = hapticAction,
+			.binding = hapticPath[1]
+		},
 	};
 
 	const XrInteractionProfileSuggestedBinding suggestedBindings = {
 		.type = XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING,
 		.next = NULL,
 		.interactionProfile = khrSimpleInteractionProfilePath,
-		.countSuggestedBindings = 4,
+		.countSuggestedBindings = 6,
 		.suggestedBindings = bindings
 	};
 
