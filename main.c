@@ -947,16 +947,19 @@ main_loop(xr_example* self)
 			spaceLocationValid[i] =
 				//(spaceLocation[i].locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 &&
 				(spaceLocation[i].locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0;
+
+			/*
+			printf("Pose %d valid %d: %f %f %f %f, %f %f %f\n", i, spaceLocationValid[i],
+				spaceLocation[0].pose.orientation.x, spaceLocation[0].pose.orientation.y,
+				spaceLocation[0].pose.orientation.z, spaceLocation[0].pose.orientation.w,
+				spaceLocation[0].pose.position.x, spaceLocation[0].pose.position.y,
+				spaceLocation[0].pose.position.z
+			);
+			*/
 		};
 
-		/*
-		printf("Left Pose: %f %f %f %f, %f %f %f\n",
-			   spaceLocation[0].pose.orientation.x, spaceLocation[0].pose.orientation.y,
-			   spaceLocation[0].pose.orientation.z, spaceLocation[0].pose.orientation.w,
-			   spaceLocation[0].pose.position.x, spaceLocation[0].pose.position.y,
-			   spaceLocation[0].pose.position.z
-  			);
-		*/
+
+
 
 
 		// --- Begin frame
