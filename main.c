@@ -657,33 +657,40 @@ main_loop(xr_example* self)
 	xrStringToPath(self->instance, "/user/hand/left", &handPaths[0]);
 	xrStringToPath(self->instance, "/user/hand/right", &handPaths[1]);
 
-	XrActionCreateInfo actionInfo = {
-		.type = XR_TYPE_ACTION_CREATE_INFO,
-		.next = NULL,
-		.actionType = XR_ACTION_TYPE_FLOAT_INPUT,
-		.countSubactionPaths = hands,
-		.subactionPaths = handPaths
-	};
-	// assuming every controller has some form of main "trigger" button
-	strcpy(actionInfo.actionName, "triggergrab");
-	strcpy(actionInfo.localizedActionName, "Grab Object with Trigger Button");
-
 	XrAction grabAction;
-	result = xrCreateAction(exampleSet, &actionInfo, &grabAction);
-	if (!xr_result(self->instance, result, "failed to create grab action"))
-		return;
+	{
+		XrActionCreateInfo actionInfo = {
+			.type = XR_TYPE_ACTION_CREATE_INFO,
+			.next = NULL,
+			.actionType = XR_ACTION_TYPE_FLOAT_INPUT,
+			.countSubactionPaths = hands,
+			.subactionPaths = handPaths
+		};
+		// assuming every controller has some form of main "trigger" button
+		strcpy(actionInfo.actionName, "triggergrab");
+		strcpy(actionInfo.localizedActionName, "Grab Object with Trigger Button");
 
-	actionInfo.actionType = XR_ACTION_TYPE_POSE_INPUT;
-	strcpy(actionInfo.actionName, "handpose");
-	strcpy(actionInfo.localizedActionName, "Hand Pose");
-	actionInfo.countSubactionPaths = hands;
-	actionInfo.subactionPaths = handPaths;
+		result = xrCreateAction(exampleSet, &actionInfo, &grabAction);
+		if (!xr_result(self->instance, result, "failed to create grab action"))
+			return;
+	}
 
 	XrAction poseAction;
-	result = xrCreateAction(exampleSet, &actionInfo, &poseAction);
-	if (!xr_result(self->instance, result, "failed to create pose action"))
-		return;
+	{
+		XrActionCreateInfo actionInfo = {
+			.type = XR_TYPE_ACTION_CREATE_INFO,
+			.next = NULL,
+			.actionType = XR_ACTION_TYPE_POSE_INPUT,
+			.countSubactionPaths = hands,
+			.subactionPaths = handPaths
+		};
+		strcpy(actionInfo.actionName, "handpose");
+		strcpy(actionInfo.localizedActionName, "Hand Pose");
 
+		result = xrCreateAction(exampleSet, &actionInfo, &poseAction);
+		if (!xr_result(self->instance, result, "failed to create pose action"))
+			return;
+	}
 
 	XrAction hapticAction;
 	{
