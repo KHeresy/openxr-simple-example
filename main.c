@@ -947,27 +947,36 @@ main_loop(xr_example* self)
 		result = xrSyncActions(self->session, &syncInfo);
 		xr_result(self->instance, result, "failed to sync actions!");
 
-		XrActionStateGetInfo getInfo = {
-			.type = XR_TYPE_ACTION_STATE_GET_INFO,
-			.next = NULL,
-			.action = grabAction,
-			.subactionPath = XR_NULL_PATH
-		};
-
 		XrActionStateFloat grabValue = {
 			.type = XR_TYPE_ACTION_STATE_FLOAT,
 			.next = NULL
 		};
-		result = xrGetActionStateFloat(self->session, &getInfo, &grabValue);
-		xr_result(self->instance, result, "failed to get grab value!");
+		{
+			XrActionStateGetInfo getInfo = {
+				.type = XR_TYPE_ACTION_STATE_GET_INFO,
+				.next = NULL,
+				.action = grabAction,
+				.subactionPath = XR_NULL_PATH
+			};
 
-		getInfo.action = poseAction;
+			result = xrGetActionStateFloat(self->session, &getInfo, &grabValue);
+			xr_result(self->instance, result, "failed to get grab value!");
+		}
+
 		XrActionStatePose poseState = {
 			.type = XR_TYPE_ACTION_STATE_POSE,
 			.next = NULL
 		};
-		result = xrGetActionStatePose(self->session, &getInfo, &poseState);
-		xr_result(self->instance, result, "failed to get pose value!");
+		{
+			XrActionStateGetInfo getInfo = {
+				.type = XR_TYPE_ACTION_STATE_GET_INFO,
+				.next = NULL,
+				.action = poseAction,
+				.subactionPath = XR_NULL_PATH
+			};
+			result = xrGetActionStatePose(self->session, &getInfo, &poseState);
+			xr_result(self->instance, result, "failed to get pose value!");
+		}
 
 		//printf("Hand poses active: %d\n", poseState.isActive);
 		//printf("Grab active %d, current %f, changed %d\n", grabValue.isActive, grabValue.currentState, grabValue.changedSinceLastSync);
