@@ -947,43 +947,30 @@ main_loop(xr_example* self)
 		result = xrSyncActions(self->session, &syncInfo);
 		xr_result(self->instance, result, "failed to sync actions!");
 
-		XrActionStateFloat grabValue = {
-			.type = XR_TYPE_ACTION_STATE_FLOAT,
-			.next = NULL
-		};
-		{
-			XrActionStateGetInfo getInfo = {
-				.type = XR_TYPE_ACTION_STATE_GET_INFO,
-				.next = NULL,
-				.action = grabAction,
-				.subactionPath = XR_NULL_PATH
-			};
-
-			result = xrGetActionStateFloat(self->session, &getInfo, &grabValue);
-			xr_result(self->instance, result, "failed to get grab value!");
-		}
-
-		XrActionStatePose poseState = {
-			.type = XR_TYPE_ACTION_STATE_POSE,
-			.next = NULL
-		};
-		{
-			XrActionStateGetInfo getInfo = {
-				.type = XR_TYPE_ACTION_STATE_GET_INFO,
-				.next = NULL,
-				.action = poseAction,
-				.subactionPath = XR_NULL_PATH
-			};
-			result = xrGetActionStatePose(self->session, &getInfo, &poseState);
-			xr_result(self->instance, result, "failed to get pose value!");
-		}
-
-		//printf("Hand poses active: %d\n", poseState.isActive);
-		//printf("Grab active %d, current %f, changed %d\n", grabValue.isActive, grabValue.currentState, grabValue.changedSinceLastSync);
-
+		// query each value / location with a subaction path != XR_NULL_PATH
+		// resulting in individual values per hand/.
+		XrActionStateFloat grabValue[hands];
 		XrSpaceLocation spaceLocation[hands];
 		bool spaceLocationValid[hands];
+
 		for (int i = 0; i < hands; i++) {
+
+			XrActionStatePose poseState = {
+				.type = XR_TYPE_ACTION_STATE_POSE,
+				.next = NULL
+			};
+			{
+				XrActionStateGetInfo getInfo = {
+					.type = XR_TYPE_ACTION_STATE_GET_INFO,
+					.next = NULL,
+					.action = poseAction,
+					.subactionPath = handPaths[i]
+				};
+				result = xrGetActionStatePose(self->session, &getInfo, &poseState);
+				xr_result(self->instance, result, "failed to get pose value!");
+			}
+			//printf("Hand pose %d active: %d\n", i, poseState.isActive);
+
 			spaceLocation[i].type = XR_TYPE_SPACE_LOCATION;
 			spaceLocation[i].next = NULL;
 
@@ -1001,10 +988,41 @@ main_loop(xr_example* self)
 				spaceLocation[0].pose.position.z
 			);
 			*/
+
+			grabValue[i].type = XR_TYPE_ACTION_STATE_FLOAT;
+			grabValue[i].next = NULL;
+			XrActionStateGetInfo getInfo = {
+				.type = XR_TYPE_ACTION_STATE_GET_INFO,
+				.next = NULL,
+				.action = grabAction,
+				.subactionPath = handPaths[i]
+			};
+
+			result = xrGetActionStateFloat(self->session, &getInfo, &grabValue[i]);
+			xr_result(self->instance, result, "failed to get grab value!");
+
+			//printf("Grab %d active %d, current %f, changed %d\n", i, grabValue[i].isActive, grabValue[i].currentState, grabValue[i].changedSinceLastSync);
+
+			if (grabValue[i].isActive && grabValue[i].currentState > 0.75) {
+				XrHapticVibration vibration =  {
+					.type = XR_TYPE_HAPTIC_VIBRATION,
+					.next = NULL,
+					.amplitude = 0.5,
+					.duration = XR_MIN_HAPTIC_DURATION,
+					.frequency = XR_FREQUENCY_UNSPECIFIED
+				};
+
+				XrHapticActionInfo hapticActionInfo = {
+					.type = XR_TYPE_HAPTIC_ACTION_INFO,
+					.next = NULL,
+					.action = hapticAction,
+					.subactionPath = handPaths[i]
+				};
+				result = xrApplyHapticFeedback(self->session, &hapticActionInfo, (const XrHapticBaseHeader*)&vibration);
+				xr_result(self->instance, result, "failed to apply haptic feedback!");
+				//printf("Sent haptic output to hand %d\n", i);
+			}
 		};
-
-
-
 
 
 		// --- Begin frame
