@@ -951,7 +951,7 @@ main_loop(xr_example* self)
 			.type = XR_TYPE_ACTION_STATE_GET_INFO,
 			.next = NULL,
 			.action = grabAction,
-			.subactionPath = handPaths[0]
+			.subactionPath = XR_NULL_PATH
 		};
 
 		XrActionStateFloat grabValue = {
