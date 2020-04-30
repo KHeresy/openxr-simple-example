@@ -675,6 +675,25 @@ main_loop(xr_example* self)
 			return;
 	}
 
+	// just an example that could sensibly use one axis of e.g. a thumbstick
+	XrAction leverAction;
+	{
+		XrActionCreateInfo actionInfo = {
+			.type = XR_TYPE_ACTION_CREATE_INFO,
+			.next = NULL,
+			.actionType = XR_ACTION_TYPE_FLOAT_INPUT,
+			.countSubactionPaths = hands,
+			.subactionPaths = handPaths
+		};
+		// assuming every controller has some form of main "trigger" button
+		strcpy(actionInfo.actionName, "lever");
+		strcpy(actionInfo.localizedActionName, "Move a lever forward or backward");
+
+		result = xrCreateAction(exampleSet, &actionInfo, &leverAction);
+		if (!xr_result(self->instance, result, "failed to create lever action"))
+			return;
+	}
+
 	XrAction poseAction;
 	{
 		XrActionCreateInfo actionInfo = {
@@ -712,6 +731,14 @@ main_loop(xr_example* self)
 	xrStringToPath(self->instance, "/user/hand/left/input/select/click", &selectClickPath[0]);
 	xrStringToPath(self->instance, "/user/hand/right/input/select/click", &selectClickPath[1]);
 
+	XrPath triggerValuePath[hands];
+	xrStringToPath(self->instance, "/user/hand/left/input/trigger/value", &triggerValuePath[0]);
+	xrStringToPath(self->instance, "/user/hand/right/input/trigger/value", &triggerValuePath[1]);
+
+	XrPath thumbstickYPath[hands];
+	xrStringToPath(self->instance, "/user/hand/left/input/thumbstick/y", &thumbstickYPath[0]);
+	xrStringToPath(self->instance, "/user/hand/right/input/thumbstick/y", &thumbstickYPath[1]);
+
 	XrPath posePath[hands];
 	xrStringToPath(self->instance, "/user/hand/left/input/grip/pose", &posePath[0]);
 	xrStringToPath(self->instance, "/user/hand/right/input/grip/pose", &posePath[1]);
@@ -720,49 +747,105 @@ main_loop(xr_example* self)
 	xrStringToPath(self->instance, "/user/hand/left/output/haptic", &hapticPath[0]);
 	xrStringToPath(self->instance, "/user/hand/right/output/haptic", &hapticPath[1]);
 
-	XrPath khrSimpleInteractionProfilePath;
-	result = xrStringToPath(self->instance, "/interaction_profiles/khr/simple_controller", &khrSimpleInteractionProfilePath);
-	if (!xr_result(self->instance, result, "failed to get interaction profile"))
-		return;
+	{
+		XrPath interactionProfilePath;
+		result = xrStringToPath(self->instance, "/interaction_profiles/khr/simple_controller", &interactionProfilePath);
+		if (!xr_result(self->instance, result, "failed to get interaction profile"))
+			return;
 
-	 const XrActionSuggestedBinding bindings[6] = {
-		{
-			.action = poseAction,
-			.binding = posePath[0]
-		},
-		{
-			.action = poseAction,
-			.binding = posePath[1]
-		},
-		{
-			.action = grabAction,
-			.binding = selectClickPath[0]
-		},
-		{
-			.action = grabAction,
-			.binding = selectClickPath[1]
-		},
-		{
-			.action = hapticAction,
-			.binding = hapticPath[0]
-		},
-		{
-			.action = hapticAction,
-			.binding = hapticPath[1]
-		},
-	};
+		const XrActionSuggestedBinding bindings[] = {
+			{
+				.action = poseAction,
+				.binding = posePath[0]
+			},
+			{
+				.action = poseAction,
+				.binding = posePath[1]
+			},
+			{
+				.action = grabAction,
+				.binding = selectClickPath[0]
+			},
+			{
+				.action = grabAction,
+				.binding = selectClickPath[1]
+			},
+			{
+				.action = hapticAction,
+				.binding = hapticPath[0]
+			},
+			{
+				.action = hapticAction,
+				.binding = hapticPath[1]
+			},
+		};
 
-	const XrInteractionProfileSuggestedBinding suggestedBindings = {
-		.type = XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING,
-		.next = NULL,
-		.interactionProfile = khrSimpleInteractionProfilePath,
-		.countSuggestedBindings = 6,
-		.suggestedBindings = bindings
-	};
+		const XrInteractionProfileSuggestedBinding suggestedBindings = {
+			.type = XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING,
+			.next = NULL,
+			.interactionProfile = interactionProfilePath,
+			.countSuggestedBindings = sizeof(bindings) / sizeof(bindings[0]),
+			.suggestedBindings = bindings
+		};
 
-	xrSuggestInteractionProfileBindings(self->instance, &suggestedBindings);
-	if (!xr_result(self->instance, result, "failed to suggest bindings"))
-		return;
+		xrSuggestInteractionProfileBindings(self->instance, &suggestedBindings);
+		if (!xr_result(self->instance, result, "failed to suggest bindings"))
+			return;
+	}
+
+	{
+		XrPath interactionProfilePath;
+		result = xrStringToPath(self->instance, "/interaction_profiles/valve/index_controller", &interactionProfilePath);
+		if (!xr_result(self->instance, result, "failed to get interaction profile"))
+			return;
+
+		const XrActionSuggestedBinding bindings[] = {
+			{
+				.action = poseAction,
+				.binding = posePath[0]
+			},
+			{
+				.action = poseAction,
+				.binding = posePath[1]
+			},
+			{
+				.action = grabAction,
+				.binding = triggerValuePath[0]
+			},
+			{
+				.action = grabAction,
+				.binding = triggerValuePath[1]
+			},
+			{
+				.action = leverAction,
+				.binding = thumbstickYPath[0]
+			},
+			{
+				.action = leverAction,
+				.binding = thumbstickYPath[1]
+			},
+			{
+				.action = hapticAction,
+				.binding = hapticPath[0]
+			},
+			{
+				.action = hapticAction,
+				.binding = hapticPath[1]
+			},
+		};
+
+		const XrInteractionProfileSuggestedBinding suggestedBindings = {
+			.type = XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING,
+			.next = NULL,
+			.interactionProfile = interactionProfilePath,
+			.countSuggestedBindings = sizeof(bindings) / sizeof(bindings[0]),
+			.suggestedBindings = bindings
+		};
+
+		xrSuggestInteractionProfileBindings(self->instance, &suggestedBindings);
+		if (!xr_result(self->instance, result, "failed to suggest bindings"))
+			return;
+	}
 
 	XrActionSpaceCreateInfo actionSpaceInfo = {
 		.type = XR_TYPE_ACTION_SPACE_CREATE_INFO,
@@ -950,6 +1033,7 @@ main_loop(xr_example* self)
 		// query each value / location with a subaction path != XR_NULL_PATH
 		// resulting in individual values per hand/.
 		XrActionStateFloat grabValue[hands];
+		XrActionStateFloat leverValue[hands];
 		XrSpaceLocation spaceLocation[hands];
 		bool spaceLocationValid[hands];
 
@@ -991,15 +1075,17 @@ main_loop(xr_example* self)
 
 			grabValue[i].type = XR_TYPE_ACTION_STATE_FLOAT;
 			grabValue[i].next = NULL;
-			XrActionStateGetInfo getInfo = {
-				.type = XR_TYPE_ACTION_STATE_GET_INFO,
-				.next = NULL,
-				.action = grabAction,
-				.subactionPath = handPaths[i]
-			};
+			{
+				XrActionStateGetInfo getInfo = {
+					.type = XR_TYPE_ACTION_STATE_GET_INFO,
+					.next = NULL,
+					.action = grabAction,
+					.subactionPath = handPaths[i]
+				};
 
-			result = xrGetActionStateFloat(self->session, &getInfo, &grabValue[i]);
-			xr_result(self->instance, result, "failed to get grab value!");
+				result = xrGetActionStateFloat(self->session, &getInfo, &grabValue[i]);
+				xr_result(self->instance, result, "failed to get grab value!");
+			}
 
 			//printf("Grab %d active %d, current %f, changed %d\n", i, grabValue[i].isActive, grabValue[i].currentState, grabValue[i].changedSinceLastSync);
 
@@ -1021,6 +1107,25 @@ main_loop(xr_example* self)
 				result = xrApplyHapticFeedback(self->session, &hapticActionInfo, (const XrHapticBaseHeader*)&vibration);
 				xr_result(self->instance, result, "failed to apply haptic feedback!");
 				//printf("Sent haptic output to hand %d\n", i);
+
+			}
+
+
+			leverValue[i].type = XR_TYPE_ACTION_STATE_FLOAT;
+			leverValue[i].next = NULL;
+			{
+				XrActionStateGetInfo getInfo = {
+					.type = XR_TYPE_ACTION_STATE_GET_INFO,
+					.next = NULL,
+					.action = leverAction,
+					.subactionPath = handPaths[i]
+				};
+
+				result = xrGetActionStateFloat(self->session, &getInfo, &leverValue[i]);
+				xr_result(self->instance, result, "failed to get lever value!");
+			}
+			if (leverValue[i].isActive && leverValue[i].currentState != 0) {
+				printf("Lever value %d: changed %d: %f\n", i, leverValue[i].changedSinceLastSync, leverValue[i].currentState);
 			}
 		};
 
