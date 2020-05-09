@@ -27,7 +27,8 @@ GLuint shaderProgramID = 0;
 GLuint VAOs[1] = {0};
 
 static const char* vertexshader =
-    "#version 450 core\n"
+    "#version 330 core\n"
+    "#extension GL_ARB_explicit_uniform_location : require\n"
     "layout(location = 0) in vec3 aPos;\n"
     "layout(location = 2) uniform mat4 model;\n"
     "layout(location = 3) uniform mat4 view;\n"
@@ -41,7 +42,8 @@ static const char* vertexshader =
     "}\n";
 
 static const char* fragmentshader =
-    "#version 450 core\n"
+    "#version 330 core\n"
+    "#extension GL_ARB_explicit_uniform_location : require\n"
     "layout(location = 0) out vec4 FragColor;\n"
     "layout(location = 1) uniform vec3 uniformColor;\n"
     "in vec2 vertexColor;\n"
