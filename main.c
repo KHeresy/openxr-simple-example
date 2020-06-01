@@ -38,6 +38,7 @@ typedef struct xr_example
 
 	// The runtime interacts with the OpenGL images (textures) via a Swapchain.
 	XrGraphicsBindingOpenGLXlibKHR graphics_binding_gl;
+	// one array of images per view
 	XrSwapchainImageOpenGLKHR** images;
 	XrSwapchain* swapchains;
 
@@ -49,7 +50,6 @@ typedef struct xr_example
 	// easy)
 	GLuint** framebuffers;
 
-	// Only used to enable OpenGL depth testing
 	GLuint depthbuffer;
 } xr_example;
 
@@ -555,26 +555,17 @@ init_openxr(xr_example* self)
 			return 1;
 	}
 
-	// most likely all swapchains have the same length, but let's not fail
-	// if they are not: create 2d array with the longest chain as second dim
-	uint32_t maxSwapchainLength = 0;
-	for (uint32_t i = 0; i < self->view_count; i++) {
-		if (swapchainLength[i] > maxSwapchainLength) {
-			maxSwapchainLength = swapchainLength[i];
-		}
-	}
-
+	// allocate one array of images and framebuffers per view
 	self->images = malloc(sizeof(XrSwapchainImageOpenGLKHR*) * self->view_count);
-	for (uint32_t i = 0; i < self->view_count; i++)
-		self->images[i] =
-		    malloc(sizeof(XrSwapchainImageOpenGLKHR) * maxSwapchainLength);
-
 	self->framebuffers = malloc(sizeof(GLuint*) * self->view_count);
-	for (uint32_t i = 0; i < self->view_count; i++)
-		self->framebuffers[i] = malloc(sizeof(GLuint) * maxSwapchainLength);
-
 
 	for (uint32_t i = 0; i < self->view_count; i++) {
+		// allocate array of images and framebuffers for this view
+		self->images[i] =
+		    malloc(sizeof(XrSwapchainImageOpenGLKHR) * swapchainLength[i]);
+		self->framebuffers[i] = malloc(sizeof(GLuint) * swapchainLength[i]);
+
+		// get OpenGL image ids from runtime
 		for (uint32_t j = 0; j < swapchainLength[i]; j++) {
 			self->images[i][j].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
 			self->images[i][j].next = NULL;
@@ -586,13 +577,12 @@ init_openxr(xr_example* self)
 		               "Failed to enumerate swapchain images"))
 			return 1;
 
+		// framebuffers are not managed or mandated by OpenXR, it's just how we
+		// happen to render into textures in this example
 		genFramebuffers(swapchainLength[i], self->framebuffers[i]);
 	}
 
-	// we also create one depth buffer that we need for OpenGL's depth testing.
-	// TODO: One depth buffer per view because the size could theoretically be
-	// different
-
+	// TODO: use swapchain and depth extension to submit depth textures too.
 	glGenTextures(1, &self->depthbuffer);
 	glBindTexture(GL_TEXTURE_2D, self->depthbuffer);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24,
