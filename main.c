@@ -23,10 +23,7 @@
 
 #include <SDL2/SDL_events.h>
 
-// upstream validation layer might not work at this time
-// enable at your own risk
 bool useCoreValidationLayer = false;
-bool useApiDumpLayer = false;
 
 typedef struct xr_example
 {
@@ -143,7 +140,6 @@ init_openxr(xr_example* self)
 	       XR_KHR_OPENGL_ENABLE_EXTENSION_NAME);
 
 	// --- Enumerate API layers
-	bool lunargApiDumpSupported = false;
 	bool lunargCoreValidationSupported = false;
 	uint32_t apiLayerCount;
 	xrEnumerateApiLayerProperties(0, &apiLayerCount, NULL);
@@ -160,9 +156,6 @@ init_openxr(xr_example* self)
 	                              apiLayerProperties);
 	for (uint32_t i = 0; i < apiLayerCount; i++) {
 		if (strcmp(apiLayerProperties[i].layerName,
-		           "XR_APILAYER_LUNARG_api_dump") == 0) {
-			lunargApiDumpSupported = true;
-		} else if (strcmp(apiLayerProperties[i].layerName,
 		                  "XR_APILAYER_LUNARG_core_validation") == 0) {
 			lunargCoreValidationSupported = true;
 		}
@@ -180,6 +173,7 @@ init_openxr(xr_example* self)
 	    .enabledExtensionCount = 1,
 	    .enabledExtensionNames = enabledExtensions,
 	    .enabledApiLayerCount = 0,
+	    .enabledApiLayerNames = NULL,
 	    .applicationInfo =
 	        {
 	            .applicationName = "OpenXR OpenGL Example",
@@ -190,19 +184,12 @@ init_openxr(xr_example* self)
 	        },
 	};
 
-	// TODO: should be possible to enable more than one
-	if (lunargApiDumpSupported && useApiDumpLayer) {
-		instanceCreateInfo.enabledApiLayerCount = 1;
-		const char* const enabledApiLayers[] = {"XR_APILAYER_LUNARG_api_dump"};
-		instanceCreateInfo.enabledApiLayerNames = enabledApiLayers;
-	}
 	if (lunargCoreValidationSupported && useCoreValidationLayer) {
 		instanceCreateInfo.enabledApiLayerCount = 1;
 		const char* const enabledApiLayers[] = {
 		    "XR_APILAYER_LUNARG_core_validation"};
 		instanceCreateInfo.enabledApiLayerNames = enabledApiLayers;
 	}
-
 
 	result = xrCreateInstance(&instanceCreateInfo, &self->instance);
 	if (!xr_result(NULL, result, "Failed to create XR instance."))
