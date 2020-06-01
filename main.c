@@ -613,6 +613,17 @@ main_loop(xr_example* self)
 	    .views = NULL,
 	};
 
+	XrCompositionLayerQuad quadLayer = {
+	    .type = XR_TYPE_COMPOSITION_LAYER_QUAD,
+	    .next = NULL,
+	    .layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT,
+	    .space = self->local_space,
+	    .eyeVisibility = XR_EYE_VISIBILITY_BOTH,
+	    .pose = {.orientation = {.x = 0.f, .y = 0.f, .z = 0.f, .w = 1.f},
+	             .position = {.x = 1.f, .y = 1.f, .z = -3.f}},
+	    .size = {.width = 1.f, .height = .5f}};
+
+
 	XrResult result;
 
 
@@ -1184,13 +1195,24 @@ main_loop(xr_example* self)
 
 		projectionLayer.views = projection_views;
 
-		const XrCompositionLayerBaseHeader* const projectionlayers[1] = {
-		    (const XrCompositionLayerBaseHeader* const) & projectionLayer};
+		// show left eye image on the quad layer
+		quadLayer.subImage = projection_views[0].subImage;
+
+		float aspect = projection_views[0].subImage.imageRect.extent.width /
+		               projection_views[0].subImage.imageRect.extent.width;
+		// 1 pixel = 1cm = 0.001m
+		quadLayer.size.width =
+		    projection_views[0].subImage.imageRect.extent.width * 0.001f;
+		quadLayer.size.height = quadLayer.size.width / aspect;
+
+		const XrCompositionLayerBaseHeader* const submittedLayers[] = {
+		    (const XrCompositionLayerBaseHeader* const) & projectionLayer,
+		    (const XrCompositionLayerBaseHeader* const) & quadLayer};
 		XrFrameEndInfo frameEndInfo = {
 		    .type = XR_TYPE_FRAME_END_INFO,
 		    .displayTime = frameState.predictedDisplayTime,
-		    .layerCount = 1,
-		    .layers = projectionlayers,
+		    .layerCount = sizeof(submittedLayers) / sizeof(submittedLayers[0]),
+		    .layers = submittedLayers,
 		    .environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE,
 		    .next = NULL};
 		result = xrEndFrame(self->session, &frameEndInfo);
