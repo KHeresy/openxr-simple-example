@@ -1169,7 +1169,7 @@ main_loop(xr_example* self)
 			projection_views[i].pose = views[i].pose;
 			projection_views[i].fov = views[i].fov;
 			projection_views[i].subImage.swapchain = self->swapchains[i];
-			projection_views[i].subImage.imageArrayIndex = bufferIndex;
+			projection_views[i].subImage.imageArrayIndex = 0;
 			projection_views[i].subImage.imageRect.offset.x = 0;
 			projection_views[i].subImage.imageRect.offset.y = 0;
 			projection_views[i].subImage.imageRect.extent.width =
