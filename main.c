@@ -924,6 +924,36 @@ main_loop(xr_example* self)
 				XrEventDataInteractionProfileChanged* event =
 				    (XrEventDataInteractionProfileChanged*)&runtimeEvent;
 				(void)event;
+
+				XrInteractionProfileState state = {
+				    .type = XR_TYPE_INTERACTION_PROFILE_STATE};
+
+				XrPath hand_paths[2];
+				xrStringToPath(self->instance, "/user/hand/left", &hand_paths[0]);
+				xrStringToPath(self->instance, "/user/hand/right", &hand_paths[1]);
+				for (int i = 0; i < 2; i++) {
+					XrResult res = xrGetCurrentInteractionProfile(self->session,
+					                                              hand_paths[i], &state);
+					if (!xr_result(self->instance, res,
+					               "Failed to get interaction "
+					               "profile for %d",
+					               i))
+						continue;
+
+					XrPath prof = state.interactionProfile;
+
+					uint32_t strl;
+					char profile_str[XR_MAX_PATH_LENGTH];
+					res = xrPathToString(self->instance, prof, XR_MAX_PATH_LENGTH, &strl,
+					                     profile_str);
+					if (!xr_result(self->instance, res,
+					               "Failed to get interaction profile path str for %s",
+					               i == 0 ? "/user/hand/left" : "/user/hand/right"))
+						continue;
+
+					printf("Event: Interaction profile changed for %s: %s\n",
+					       i == 0 ? "/user/hand/left" : "/user/hand/right", profile_str);
+				}
 				// TODO: do something
 				break;
 			}
