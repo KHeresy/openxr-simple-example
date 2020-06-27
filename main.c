@@ -156,7 +156,7 @@ init_openxr(xr_example* self)
 	                              apiLayerProperties);
 	for (uint32_t i = 0; i < apiLayerCount; i++) {
 		if (strcmp(apiLayerProperties[i].layerName,
-		                  "XR_APILAYER_LUNARG_core_validation") == 0) {
+		           "XR_APILAYER_LUNARG_core_validation") == 0) {
 			lunargCoreValidationSupported = true;
 		}
 		printf("%s%s", apiLayerProperties[i].layerName,
@@ -358,10 +358,13 @@ init_openxr(xr_example* self)
 		XrGraphicsRequirementsOpenGLKHR opengl_reqs = {
 		    .type = XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR, .next = NULL};
 
-		PFN_xrGetOpenGLGraphicsRequirementsKHR pfnGetOpenGLGraphicsRequirementsKHR = NULL;
-		result = xrGetInstanceProcAddr(self->instance, "xrGetOpenGLGraphicsRequirementsKHR",
-		                               (PFN_xrVoidFunction *)&pfnGetOpenGLGraphicsRequirementsKHR);
-		result = pfnGetOpenGLGraphicsRequirementsKHR(self->instance, systemId, &opengl_reqs);
+		PFN_xrGetOpenGLGraphicsRequirementsKHR pfnGetOpenGLGraphicsRequirementsKHR =
+		    NULL;
+		result = xrGetInstanceProcAddr(
+		    self->instance, "xrGetOpenGLGraphicsRequirementsKHR",
+		    (PFN_xrVoidFunction*)&pfnGetOpenGLGraphicsRequirementsKHR);
+		result = pfnGetOpenGLGraphicsRequirementsKHR(self->instance, systemId,
+		                                             &opengl_reqs);
 		if (!xr_result(self->instance, result,
 		               "Failed to get OpenGL graphics requirements!"))
 			return 1;
@@ -628,10 +631,7 @@ main_loop(xr_example* self)
 
 
 	XrActionSetCreateInfo exampleSetInfo = {
-		.type = XR_TYPE_ACTION_SET_CREATE_INFO,
-		.next = NULL,
-		.priority = 0
-	};
+	    .type = XR_TYPE_ACTION_SET_CREATE_INFO, .next = NULL, .priority = 0};
 	strcpy(exampleSetInfo.actionSetName, "exampleset");
 	strcpy(exampleSetInfo.localizedActionSetName, "Example Action Set");
 
@@ -647,13 +647,11 @@ main_loop(xr_example* self)
 
 	XrAction grabAction;
 	{
-		XrActionCreateInfo actionInfo = {
-			.type = XR_TYPE_ACTION_CREATE_INFO,
-			.next = NULL,
-			.actionType = XR_ACTION_TYPE_FLOAT_INPUT,
-			.countSubactionPaths = hands,
-			.subactionPaths = handPaths
-		};
+		XrActionCreateInfo actionInfo = {.type = XR_TYPE_ACTION_CREATE_INFO,
+		                                 .next = NULL,
+		                                 .actionType = XR_ACTION_TYPE_FLOAT_INPUT,
+		                                 .countSubactionPaths = hands,
+		                                 .subactionPaths = handPaths};
 		// assuming every controller has some form of main "trigger" button
 		strcpy(actionInfo.actionName, "triggergrab");
 		strcpy(actionInfo.localizedActionName, "Grab Object with Trigger Button");
@@ -666,13 +664,11 @@ main_loop(xr_example* self)
 	// just an example that could sensibly use one axis of e.g. a thumbstick
 	XrAction leverAction;
 	{
-		XrActionCreateInfo actionInfo = {
-			.type = XR_TYPE_ACTION_CREATE_INFO,
-			.next = NULL,
-			.actionType = XR_ACTION_TYPE_FLOAT_INPUT,
-			.countSubactionPaths = hands,
-			.subactionPaths = handPaths
-		};
+		XrActionCreateInfo actionInfo = {.type = XR_TYPE_ACTION_CREATE_INFO,
+		                                 .next = NULL,
+		                                 .actionType = XR_ACTION_TYPE_FLOAT_INPUT,
+		                                 .countSubactionPaths = hands,
+		                                 .subactionPaths = handPaths};
 		// assuming every controller has some form of main "trigger" button
 		strcpy(actionInfo.actionName, "lever");
 		strcpy(actionInfo.localizedActionName, "Move a lever forward or backward");
@@ -684,13 +680,11 @@ main_loop(xr_example* self)
 
 	XrAction poseAction;
 	{
-		XrActionCreateInfo actionInfo = {
-			.type = XR_TYPE_ACTION_CREATE_INFO,
-			.next = NULL,
-			.actionType = XR_ACTION_TYPE_POSE_INPUT,
-			.countSubactionPaths = hands,
-			.subactionPaths = handPaths
-		};
+		XrActionCreateInfo actionInfo = {.type = XR_TYPE_ACTION_CREATE_INFO,
+		                                 .next = NULL,
+		                                 .actionType = XR_ACTION_TYPE_POSE_INPUT,
+		                                 .countSubactionPaths = hands,
+		                                 .subactionPaths = handPaths};
 		strcpy(actionInfo.actionName, "handpose");
 		strcpy(actionInfo.localizedActionName, "Hand Pose");
 
@@ -701,13 +695,12 @@ main_loop(xr_example* self)
 
 	XrAction hapticAction;
 	{
-		XrActionCreateInfo actionInfo = {
-			.type = XR_TYPE_ACTION_CREATE_INFO,
-			.next = NULL,
-			.actionType = XR_ACTION_TYPE_VIBRATION_OUTPUT,
-			.countSubactionPaths = hands,
-			.subactionPaths = handPaths
-		};
+		XrActionCreateInfo actionInfo = {.type = XR_TYPE_ACTION_CREATE_INFO,
+		                                 .next = NULL,
+		                                 .actionType =
+		                                     XR_ACTION_TYPE_VIBRATION_OUTPUT,
+		                                 .countSubactionPaths = hands,
+		                                 .subactionPaths = handPaths};
 		strcpy(actionInfo.actionName, "haptic");
 		strcpy(actionInfo.localizedActionName, "Haptic Vibration");
 		result = xrCreateAction(exampleSet, &actionInfo, &hapticAction);
@@ -716,65 +709,58 @@ main_loop(xr_example* self)
 	}
 
 	XrPath selectClickPath[hands];
-	xrStringToPath(self->instance, "/user/hand/left/input/select/click", &selectClickPath[0]);
-	xrStringToPath(self->instance, "/user/hand/right/input/select/click", &selectClickPath[1]);
+	xrStringToPath(self->instance, "/user/hand/left/input/select/click",
+	               &selectClickPath[0]);
+	xrStringToPath(self->instance, "/user/hand/right/input/select/click",
+	               &selectClickPath[1]);
 
 	XrPath triggerValuePath[hands];
-	xrStringToPath(self->instance, "/user/hand/left/input/trigger/value", &triggerValuePath[0]);
-	xrStringToPath(self->instance, "/user/hand/right/input/trigger/value", &triggerValuePath[1]);
+	xrStringToPath(self->instance, "/user/hand/left/input/trigger/value",
+	               &triggerValuePath[0]);
+	xrStringToPath(self->instance, "/user/hand/right/input/trigger/value",
+	               &triggerValuePath[1]);
 
 	XrPath thumbstickYPath[hands];
-	xrStringToPath(self->instance, "/user/hand/left/input/thumbstick/y", &thumbstickYPath[0]);
-	xrStringToPath(self->instance, "/user/hand/right/input/thumbstick/y", &thumbstickYPath[1]);
+	xrStringToPath(self->instance, "/user/hand/left/input/thumbstick/y",
+	               &thumbstickYPath[0]);
+	xrStringToPath(self->instance, "/user/hand/right/input/thumbstick/y",
+	               &thumbstickYPath[1]);
 
 	XrPath posePath[hands];
-	xrStringToPath(self->instance, "/user/hand/left/input/grip/pose", &posePath[0]);
-	xrStringToPath(self->instance, "/user/hand/right/input/grip/pose", &posePath[1]);
+	xrStringToPath(self->instance, "/user/hand/left/input/grip/pose",
+	               &posePath[0]);
+	xrStringToPath(self->instance, "/user/hand/right/input/grip/pose",
+	               &posePath[1]);
 
 	XrPath hapticPath[hands];
-	xrStringToPath(self->instance, "/user/hand/left/output/haptic", &hapticPath[0]);
-	xrStringToPath(self->instance, "/user/hand/right/output/haptic", &hapticPath[1]);
+	xrStringToPath(self->instance, "/user/hand/left/output/haptic",
+	               &hapticPath[0]);
+	xrStringToPath(self->instance, "/user/hand/right/output/haptic",
+	               &hapticPath[1]);
 
 	{
 		XrPath interactionProfilePath;
-		result = xrStringToPath(self->instance, "/interaction_profiles/khr/simple_controller", &interactionProfilePath);
+		result = xrStringToPath(self->instance,
+		                        "/interaction_profiles/khr/simple_controller",
+		                        &interactionProfilePath);
 		if (!xr_result(self->instance, result, "failed to get interaction profile"))
 			return;
 
 		const XrActionSuggestedBinding bindings[] = {
-			{
-				.action = poseAction,
-				.binding = posePath[0]
-			},
-			{
-				.action = poseAction,
-				.binding = posePath[1]
-			},
-			{
-				.action = grabAction,
-				.binding = selectClickPath[0]
-			},
-			{
-				.action = grabAction,
-				.binding = selectClickPath[1]
-			},
-			{
-				.action = hapticAction,
-				.binding = hapticPath[0]
-			},
-			{
-				.action = hapticAction,
-				.binding = hapticPath[1]
-			},
+		    {.action = poseAction, .binding = posePath[0]},
+		    {.action = poseAction, .binding = posePath[1]},
+		    {.action = grabAction, .binding = selectClickPath[0]},
+		    {.action = grabAction, .binding = selectClickPath[1]},
+		    {.action = hapticAction, .binding = hapticPath[0]},
+		    {.action = hapticAction, .binding = hapticPath[1]},
 		};
 
 		const XrInteractionProfileSuggestedBinding suggestedBindings = {
-			.type = XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING,
-			.next = NULL,
-			.interactionProfile = interactionProfilePath,
-			.countSuggestedBindings = sizeof(bindings) / sizeof(bindings[0]),
-			.suggestedBindings = bindings
-		};
+		    .type = XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING,
+		    .next = NULL,
+		    .interactionProfile = interactionProfilePath,
+		    .countSuggestedBindings = sizeof(bindings) / sizeof(bindings[0]),
+		    .suggestedBindings = bindings};
 
 		xrSuggestInteractionProfileBindings(self->instance, &suggestedBindings);
 		if (!xr_result(self->instance, result, "failed to suggest bindings"))
@@ -783,52 +769,29 @@ main_loop(xr_example* self)
 
 	{
 		XrPath interactionProfilePath;
-		result = xrStringToPath(self->instance, "/interaction_profiles/valve/index_controller", &interactionProfilePath);
+		result = xrStringToPath(self->instance,
+		                        "/interaction_profiles/valve/index_controller",
+		                        &interactionProfilePath);
 		if (!xr_result(self->instance, result, "failed to get interaction profile"))
 			return;
 
 		const XrActionSuggestedBinding bindings[] = {
-			{
-				.action = poseAction,
-				.binding = posePath[0]
-			},
-			{
-				.action = poseAction,
-				.binding = posePath[1]
-			},
-			{
-				.action = grabAction,
-				.binding = triggerValuePath[0]
-			},
-			{
-				.action = grabAction,
-				.binding = triggerValuePath[1]
-			},
-			{
-				.action = leverAction,
-				.binding = thumbstickYPath[0]
-			},
-			{
-				.action = leverAction,
-				.binding = thumbstickYPath[1]
-			},
-			{
-				.action = hapticAction,
-				.binding = hapticPath[0]
-			},
-			{
-				.action = hapticAction,
-				.binding = hapticPath[1]
-			},
+		    {.action = poseAction, .binding = posePath[0]},
+		    {.action = poseAction, .binding = posePath[1]},
+		    {.action = grabAction, .binding = triggerValuePath[0]},
+		    {.action = grabAction, .binding = triggerValuePath[1]},
+		    {.action = leverAction, .binding = thumbstickYPath[0]},
+		    {.action = leverAction, .binding = thumbstickYPath[1]},
+		    {.action = hapticAction, .binding = hapticPath[0]},
+		    {.action = hapticAction, .binding = hapticPath[1]},
 		};
 
 		const XrInteractionProfileSuggestedBinding suggestedBindings = {
-			.type = XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING,
-			.next = NULL,
-			.interactionProfile = interactionProfilePath,
-			.countSuggestedBindings = sizeof(bindings) / sizeof(bindings[0]),
-			.suggestedBindings = bindings
-		};
+		    .type = XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING,
+		    .next = NULL,
+		    .interactionProfile = interactionProfilePath,
+		    .countSuggestedBindings = sizeof(bindings) / sizeof(bindings[0]),
+		    .suggestedBindings = bindings};
 
 		xrSuggestInteractionProfileBindings(self->instance, &suggestedBindings);
 		if (!xr_result(self->instance, result, "failed to suggest bindings"))
@@ -836,29 +799,29 @@ main_loop(xr_example* self)
 	}
 
 	XrActionSpaceCreateInfo actionSpaceInfo = {
-		.type = XR_TYPE_ACTION_SPACE_CREATE_INFO,
-		.next = NULL,
-		.action = poseAction,
-		.poseInActionSpace.orientation.w = 1.f,
-		.subactionPath = handPaths[0]
-	};
+	    .type = XR_TYPE_ACTION_SPACE_CREATE_INFO,
+	    .next = NULL,
+	    .action = poseAction,
+	    .poseInActionSpace.orientation.w = 1.f,
+	    .subactionPath = handPaths[0]};
 
 	XrSpace handSpaces[hands];
 	result = xrCreateActionSpace(self->session, &actionSpaceInfo, &handSpaces[0]);
-	if (!xr_result(self->instance, result, "failed to create left hand pose space"))
+	if (!xr_result(self->instance, result,
+	               "failed to create left hand pose space"))
 		return;
 
 	actionSpaceInfo.subactionPath = handPaths[1];
 	result = xrCreateActionSpace(self->session, &actionSpaceInfo, &handSpaces[1]);
-	if (!xr_result(self->instance, result, "failed to create right hand pose space"))
+	if (!xr_result(self->instance, result,
+	               "failed to create right hand pose space"))
 		return;
 
 	XrSessionActionSetsAttachInfo attachInfo = {
-		.type = XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO,
-		.next = NULL,
-		.countActionSets = 1,
-		.actionSets = &exampleSet
-	};
+	    .type = XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO,
+	    .next = NULL,
+	    .countActionSets = 1,
+	    .actionSets = &exampleSet};
 	result = xrAttachSessionActionSets(self->session, &attachInfo);
 	if (!xr_result(self->instance, result, "failed to attach action set"))
 		return;
@@ -1061,93 +1024,89 @@ main_loop(xr_example* self)
 
 		for (int i = 0; i < hands; i++) {
 
-			XrActionStatePose poseState = {
-				.type = XR_TYPE_ACTION_STATE_POSE,
-				.next = NULL
-			};
+			XrActionStatePose poseState = {.type = XR_TYPE_ACTION_STATE_POSE,
+			                               .next = NULL};
 			{
-				XrActionStateGetInfo getInfo = {
-					.type = XR_TYPE_ACTION_STATE_GET_INFO,
-					.next = NULL,
-					.action = poseAction,
-					.subactionPath = handPaths[i]
-				};
+				XrActionStateGetInfo getInfo = {.type = XR_TYPE_ACTION_STATE_GET_INFO,
+				                                .next = NULL,
+				                                .action = poseAction,
+				                                .subactionPath = handPaths[i]};
 				result = xrGetActionStatePose(self->session, &getInfo, &poseState);
 				xr_result(self->instance, result, "failed to get pose value!");
 			}
-			//printf("Hand pose %d active: %d\n", i, poseState.isActive);
+			// printf("Hand pose %d active: %d\n", i, poseState.isActive);
 
 			spaceLocation[i].type = XR_TYPE_SPACE_LOCATION;
 			spaceLocation[i].next = NULL;
 
-			result = xrLocateSpace(handSpaces[i], self->local_space, frameState.predictedDisplayTime, &spaceLocation[i]);
+			result =
+			    xrLocateSpace(handSpaces[i], self->local_space,
+			                  frameState.predictedDisplayTime, &spaceLocation[i]);
 			xr_result(self->instance, result, "failed to locate space %d!", i);
 			spaceLocationValid[i] =
-				//(spaceLocation[i].locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 &&
-				(spaceLocation[i].locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0;
+			    //(spaceLocation[i].locationFlags &
+			    //XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 &&
+			    (spaceLocation[i].locationFlags &
+			     XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0;
 
 			/*
-			printf("Pose %d valid %d: %f %f %f %f, %f %f %f\n", i, spaceLocationValid[i],
-				spaceLocation[0].pose.orientation.x, spaceLocation[0].pose.orientation.y,
-				spaceLocation[0].pose.orientation.z, spaceLocation[0].pose.orientation.w,
-				spaceLocation[0].pose.position.x, spaceLocation[0].pose.position.y,
-				spaceLocation[0].pose.position.z
+			printf("Pose %d valid %d: %f %f %f %f, %f %f %f\n", i,
+			spaceLocationValid[i], spaceLocation[0].pose.orientation.x,
+			spaceLocation[0].pose.orientation.y, spaceLocation[0].pose.orientation.z,
+			spaceLocation[0].pose.orientation.w, spaceLocation[0].pose.position.x,
+			spaceLocation[0].pose.position.y, spaceLocation[0].pose.position.z
 			);
 			*/
 
 			grabValue[i].type = XR_TYPE_ACTION_STATE_FLOAT;
 			grabValue[i].next = NULL;
 			{
-				XrActionStateGetInfo getInfo = {
-					.type = XR_TYPE_ACTION_STATE_GET_INFO,
-					.next = NULL,
-					.action = grabAction,
-					.subactionPath = handPaths[i]
-				};
+				XrActionStateGetInfo getInfo = {.type = XR_TYPE_ACTION_STATE_GET_INFO,
+				                                .next = NULL,
+				                                .action = grabAction,
+				                                .subactionPath = handPaths[i]};
 
 				result = xrGetActionStateFloat(self->session, &getInfo, &grabValue[i]);
 				xr_result(self->instance, result, "failed to get grab value!");
 			}
 
-			//printf("Grab %d active %d, current %f, changed %d\n", i, grabValue[i].isActive, grabValue[i].currentState, grabValue[i].changedSinceLastSync);
+			// printf("Grab %d active %d, current %f, changed %d\n", i,
+			// grabValue[i].isActive, grabValue[i].currentState,
+			// grabValue[i].changedSinceLastSync);
 
 			if (grabValue[i].isActive && grabValue[i].currentState > 0.75) {
-				XrHapticVibration vibration =  {
-					.type = XR_TYPE_HAPTIC_VIBRATION,
-					.next = NULL,
-					.amplitude = 0.5,
-					.duration = XR_MIN_HAPTIC_DURATION,
-					.frequency = XR_FREQUENCY_UNSPECIFIED
-				};
+				XrHapticVibration vibration = {.type = XR_TYPE_HAPTIC_VIBRATION,
+				                               .next = NULL,
+				                               .amplitude = 0.5,
+				                               .duration = XR_MIN_HAPTIC_DURATION,
+				                               .frequency = XR_FREQUENCY_UNSPECIFIED};
 
-				XrHapticActionInfo hapticActionInfo = {
-					.type = XR_TYPE_HAPTIC_ACTION_INFO,
-					.next = NULL,
-					.action = hapticAction,
-					.subactionPath = handPaths[i]
-				};
-				result = xrApplyHapticFeedback(self->session, &hapticActionInfo, (const XrHapticBaseHeader*)&vibration);
+				XrHapticActionInfo hapticActionInfo = {.type =
+				                                           XR_TYPE_HAPTIC_ACTION_INFO,
+				                                       .next = NULL,
+				                                       .action = hapticAction,
+				                                       .subactionPath = handPaths[i]};
+				result = xrApplyHapticFeedback(self->session, &hapticActionInfo,
+				                               (const XrHapticBaseHeader*)&vibration);
 				xr_result(self->instance, result, "failed to apply haptic feedback!");
-				//printf("Sent haptic output to hand %d\n", i);
-
+				// printf("Sent haptic output to hand %d\n", i);
 			}
 
 
 			leverValue[i].type = XR_TYPE_ACTION_STATE_FLOAT;
 			leverValue[i].next = NULL;
 			{
-				XrActionStateGetInfo getInfo = {
-					.type = XR_TYPE_ACTION_STATE_GET_INFO,
-					.next = NULL,
-					.action = leverAction,
-					.subactionPath = handPaths[i]
-				};
+				XrActionStateGetInfo getInfo = {.type = XR_TYPE_ACTION_STATE_GET_INFO,
+				                                .next = NULL,
+				                                .action = leverAction,
+				                                .subactionPath = handPaths[i]};
 
 				result = xrGetActionStateFloat(self->session, &getInfo, &leverValue[i]);
 				xr_result(self->instance, result, "failed to get lever value!");
 			}
 			if (leverValue[i].isActive && leverValue[i].currentState != 0) {
-				printf("Lever value %d: changed %d: %f\n", i, leverValue[i].changedSinceLastSync, leverValue[i].currentState);
+				printf("Lever value %d: changed %d: %f\n", i,
+				       leverValue[i].changedSinceLastSync, leverValue[i].currentState);
 			}
 		};
 
@@ -1213,9 +1172,9 @@ main_loop(xr_example* self)
 
 			renderFrame(self->configuration_views[i].recommendedImageRectWidth,
 			            self->configuration_views[i].recommendedImageRectHeight,
-			            projectionMatrix, inverseViewMatrix, &spaceLocation[0], &spaceLocation[1],
-			            self->framebuffers[i][bufferIndex], self->depthbuffer,
-			            self->images[i][bufferIndex], i,
+			            projectionMatrix, inverseViewMatrix, &spaceLocation[0],
+			            &spaceLocation[1], self->framebuffers[i][bufferIndex],
+			            self->depthbuffer, self->images[i][bufferIndex], i,
 			            frameState.predictedDisplayTime);
 			glFinish();
 			XrSwapchainImageReleaseInfo swapchainImageReleaseInfo = {
