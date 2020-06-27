@@ -877,7 +877,7 @@ main_loop(xr_example* self)
 		                                  .next = NULL};
 		bool isStopping = false;
 		XrResult pollResult = xrPollEvent(self->instance, &runtimeEvent);
-		if (pollResult == XR_SUCCESS) {
+		while (pollResult == XR_SUCCESS) {
 			switch (runtimeEvent.type) {
 			case XR_TYPE_EVENT_DATA_EVENTS_LOST: {
 				XrEventDataEventsLost* event = (XrEventDataEventsLost*)&runtimeEvent;
@@ -946,8 +946,12 @@ main_loop(xr_example* self)
 			}
 			default: printf("Unhandled event type %d\n", runtimeEvent.type);
 			}
-		} else if (pollResult == XR_EVENT_UNAVAILABLE) {
-			// this is the usual case
+
+			runtimeEvent.type = XR_TYPE_EVENT_DATA_BUFFER;
+			pollResult = xrPollEvent(self->instance, &runtimeEvent);
+		}
+		if (pollResult == XR_EVENT_UNAVAILABLE) {
+			// processed all events in the queue
 		} else {
 			printf("Failed to poll events!\n");
 			break;
