@@ -51,6 +51,9 @@ typedef struct xr_example
 	GLuint** framebuffers;
 
 	GLuint depthbuffer;
+
+	bool hand_tracking_supported;
+	XrHandTrackerEXT hand_trackers[2];
 } xr_example;
 
 bool
@@ -139,6 +142,11 @@ init_openxr(xr_example* self)
 	printf("Runtime supports required extension %s\n",
 	       XR_KHR_OPENGL_ENABLE_EXTENSION_NAME);
 
+	bool hand_tracking_extension_supported = isExtensionSupported(
+	    XR_EXT_HAND_TRACKING_EXTENSION_NAME, extensionProperties, extensionCount);
+	printf("Runtime does%s support hand tracking extension\n",
+	       hand_tracking_extension_supported ? "" : " NOT");
+
 	// --- Enumerate API layers
 	bool lunargCoreValidationSupported = false;
 	uint32_t apiLayerCount;
@@ -164,13 +172,19 @@ init_openxr(xr_example* self)
 	}
 
 	// --- Create XrInstance
-	const char* const enabledExtensions[] = {XR_KHR_OPENGL_ENABLE_EXTENSION_NAME};
+	const char* enabledExtensions[2] = {XR_KHR_OPENGL_ENABLE_EXTENSION_NAME};
+
+	int enabledExtensionCount = 1;
+	if (hand_tracking_extension_supported) {
+		enabledExtensions[enabledExtensionCount++] =
+		    XR_EXT_HAND_TRACKING_EXTENSION_NAME;
+	}
 
 	XrInstanceCreateInfo instanceCreateInfo = {
 	    .type = XR_TYPE_INSTANCE_CREATE_INFO,
 	    .next = NULL,
 	    .createFlags = 0,
-	    .enabledExtensionCount = 1,
+	    .enabledExtensionCount = enabledExtensionCount,
 	    .enabledExtensionNames = enabledExtensions,
 	    .enabledApiLayerCount = 0,
 	    .enabledApiLayerNames = NULL,
@@ -227,11 +241,16 @@ init_openxr(xr_example* self)
 
 	printf("Successfully got XrSystem %lu for HMD form factor\n", systemId);
 
-	// checking system properties is optional!
+
+	// checking system properties is optional, but if the hand tracking
+	// extension is supported, we do want to know if the system supports it.
 	{
+		XrSystemHandTrackingPropertiesEXT ht = {
+		    .type = XR_TYPE_SYSTEM_HAND_TRACKING_PROPERTIES_EXT, .next = NULL};
+
 		XrSystemProperties systemProperties = {
 		    .type = XR_TYPE_SYSTEM_PROPERTIES,
-		    .next = NULL,
+		    .next = &ht,
 		    .graphicsProperties = {0},
 		    .trackingProperties = {0},
 		};
@@ -239,6 +258,9 @@ init_openxr(xr_example* self)
 		result = xrGetSystemProperties(self->instance, systemId, &systemProperties);
 		if (!xr_result(self->instance, result, "Failed to get System properties"))
 			return 1;
+
+		self->hand_tracking_supported =
+		    hand_tracking_extension_supported && ht.supportsHandTracking;
 
 		printf("System properties for system %lu: \"%s\", vendor ID %d\n",
 		       systemProperties.systemId, systemProperties.systemName,
@@ -253,6 +275,10 @@ init_openxr(xr_example* self)
 		       systemProperties.trackingProperties.orientationTracking);
 		printf("\tPosition Tracking   : %d\n",
 		       systemProperties.trackingProperties.positionTracking);
+
+		if (hand_tracking_extension_supported) {
+			printf("\tHand Tracking       : %d\n", ht.supportsHandTracking);
+		}
 	}
 
 	// --- Enumerate and set up Views
@@ -363,6 +389,9 @@ init_openxr(xr_example* self)
 		result = xrGetInstanceProcAddr(
 		    self->instance, "xrGetOpenGLGraphicsRequirementsKHR",
 		    (PFN_xrVoidFunction*)&pfnGetOpenGLGraphicsRequirementsKHR);
+		if (!xr_result(self->instance, result,
+		               "Failed to get OpenGL graphics requirements function!"))
+			return 1;
 		result = pfnGetOpenGLGraphicsRequirementsKHR(self->instance, systemId,
 		                                             &opengl_reqs);
 		if (!xr_result(self->instance, result,
@@ -429,6 +458,46 @@ init_openxr(xr_example* self)
 	const GLubyte* version_string = glGetString(GL_VERSION);
 	printf("Using OpenGL version: %s\n", version_string);
 	printf("Using OpenGL Renderer: %s\n", renderer_string);
+
+
+
+	if (self->hand_tracking_supported) {
+		PFN_xrCreateHandTrackerEXT pfnCreateHandTrackerEXT = NULL;
+		result =
+		    xrGetInstanceProcAddr(self->instance, "xrCreateHandTrackerEXT",
+		                          (PFN_xrVoidFunction*)&pfnCreateHandTrackerEXT);
+
+		if (!xr_result(self->instance, result,
+		               "Failed to get xrCreateHandTrackerEXT function!"))
+			return 1;
+
+		{
+			XrHandTrackerCreateInfoEXT hand_tracker_create_info = {
+			    .type = XR_TYPE_HAND_TRACKER_CREATE_INFO_EXT,
+			    .next = NULL,
+			    .hand = XR_HAND_LEFT_EXT,
+			    .handJointSet = XR_HAND_JOINT_SET_DEFAULT_EXT};
+			result = pfnCreateHandTrackerEXT(self->session, &hand_tracker_create_info,
+			                                 &self->hand_trackers[0]);
+			if (xr_result(self->instance, result,
+			              "Failed to create left hand tracker")) {
+				printf("Created hand tracker for left hand\n");
+			}
+		}
+		{
+			XrHandTrackerCreateInfoEXT hand_tracker_create_info = {
+			    .type = XR_TYPE_HAND_TRACKER_CREATE_INFO_EXT,
+			    .next = NULL,
+			    .hand = XR_HAND_RIGHT_EXT,
+			    .handJointSet = XR_HAND_JOINT_SET_DEFAULT_EXT};
+			result = pfnCreateHandTrackerEXT(self->session, &hand_tracker_create_info,
+			                                 &self->hand_trackers[1]);
+			if (xr_result(self->instance, result,
+			              "Failed to create right hand tracker")) {
+				printf("Created hand tracker for right hand\n");
+			}
+		}
+	}
 
 	// --- Check supported reference spaces
 	// we don't *need* to check the supported reference spaces if we're confident
@@ -827,6 +896,16 @@ main_loop(xr_example* self)
 		return;
 
 
+	PFN_xrLocateHandJointsEXT pfnLocateHandJointsEXT = NULL;
+	if (self->hand_tracking_supported) {
+		result =
+		    xrGetInstanceProcAddr(self->instance, "xrLocateHandJointsEXT",
+		                          (PFN_xrVoidFunction*)&pfnLocateHandJointsEXT);
+
+		xr_result(self->instance, result,
+		          "Failed to get xrLocateHandJointsEXT function!");
+	}
+
 	while (running) {
 
 		// --- Handle runtime Events
@@ -980,6 +1059,50 @@ main_loop(xr_example* self)
 		               "xrWaitFrame() was not successful, exiting..."))
 			break;
 
+
+		XrHandJointLocationEXT joints[2][XR_HAND_JOINT_COUNT_EXT];
+		XrHandJointLocationsEXT joint_locations[2] = {{
+		    0,
+		}};
+		if (self->hand_tracking_supported) {
+
+			for (int i = 0; i < 2; i++) {
+
+				joint_locations[i] = (XrHandJointLocationsEXT){
+				    .type = XR_TYPE_HAND_JOINT_LOCATIONS_EXT,
+				    .jointCount = XR_HAND_JOINT_COUNT_EXT,
+				    .jointLocations = joints[i],
+				};
+
+				if (self->hand_trackers[i] == NULL)
+					continue;
+
+				XrHandJointsLocateInfoEXT locateInfo = {
+				    .type = XR_TYPE_HAND_JOINTS_LOCATE_INFO_EXT,
+				    .next = NULL,
+				    .baseSpace = self->local_space,
+				    .time = frameState.predictedDisplayTime};
+
+				result = pfnLocateHandJointsEXT(self->hand_trackers[i], &locateInfo,
+				                                &joint_locations[i]);
+				if (!xr_result(self->instance, result,
+				               "failed to locate hand %d joints!", i))
+					break;
+
+				/*
+				if (joint_locations[i].isActive) {
+				  printf("located hand %d joints", i);
+				  for (uint32_t j = 0; j < joint_locations[i].jointCount; j++) {
+				    printf("%f ", joint_locations[i].jointLocations[j].radius);
+				  }
+				  printf("\n");
+				} else {
+				  printf("hand %d joints inactive\n", i);
+				}
+				*/
+			}
+		}
+
 		// --- Create projection matrices and view matrices for each eye
 		XrViewLocateInfo viewLocateInfo = {
 		    .type = XR_TYPE_VIEW_LOCATE_INFO,
@@ -1110,7 +1233,6 @@ main_loop(xr_example* self)
 			}
 		};
 
-
 		// --- Begin frame
 		XrFrameBeginInfo frameBeginInfo = {.type = XR_TYPE_FRAME_BEGIN_INFO,
 		                                   .next = NULL};
@@ -1173,8 +1295,9 @@ main_loop(xr_example* self)
 			renderFrame(self->configuration_views[i].recommendedImageRectWidth,
 			            self->configuration_views[i].recommendedImageRectHeight,
 			            projectionMatrix, inverseViewMatrix, &spaceLocation[0],
-			            &spaceLocation[1], self->framebuffers[i][bufferIndex],
-			            self->depthbuffer, self->images[i][bufferIndex], i,
+			            &spaceLocation[1], joint_locations,
+			            self->framebuffers[i][bufferIndex], self->depthbuffer,
+			            self->images[i][bufferIndex], i,
 			            frameState.predictedDisplayTime);
 			glFinish();
 			XrSwapchainImageReleaseInfo swapchainImageReleaseInfo = {
@@ -1226,6 +1349,33 @@ sdl_handle_events(SDL_Event event, bool* request_exit)
 void
 cleanup(xr_example* self)
 {
+	XrResult result;
+
+	if (self->hand_tracking_supported) {
+		PFN_xrDestroyHandTrackerEXT pfnDestroyHandTrackerEXT = NULL;
+		result =
+		    xrGetInstanceProcAddr(self->instance, "xrDestroyHandTrackerEXT",
+		                          (PFN_xrVoidFunction*)&pfnDestroyHandTrackerEXT);
+
+		xr_result(self->instance, result,
+		          "Failed to get xrDestroyHandTrackerEXT function!");
+
+		if (self->hand_trackers[0]) {
+			result = pfnDestroyHandTrackerEXT(self->hand_trackers[0]);
+			if (xr_result(self->instance, result,
+			              "Failed to destroy left hand tracker")) {
+				printf("Destroyed hand tracker for left hand\n");
+			}
+		}
+		if (self->hand_trackers[1]) {
+			result = pfnDestroyHandTrackerEXT(self->hand_trackers[1]);
+			if (xr_result(self->instance, result,
+			              "Failed to destroy left hand tracker")) {
+				printf("Destroyed hand tracker for left hand\n");
+			}
+		}
+	}
+
 	xrDestroySession(self->session);
 	xrDestroyInstance(self->instance);
 }
@@ -1233,7 +1383,9 @@ cleanup(xr_example* self)
 int
 main()
 {
-	xr_example self;
+	xr_example self = {
+	    .instance = XR_NULL_HANDLE,
+	};
 	int ret = init_openxr(&self);
 	if (ret != 0)
 		return ret;

@@ -215,6 +215,7 @@ renderFrame(int w,
             XrMatrix4x4f viewmatrix,
             XrSpaceLocation* leftHand,
             XrSpaceLocation* rightHand,
+            XrHandJointLocationsEXT* joint_locations,
             GLuint framebuffer,
             GLuint depthbuffer,
             XrSwapchainImageOpenGLKHR image,
@@ -312,6 +313,41 @@ renderFrame(int w,
 		glUniform3f(color, 0.5, 1.0, 0.5);
 		glDrawArrays(GL_TRIANGLES, 0, 36);
 	}
+
+	for (int hand = 0; hand < 2; hand++) {
+		if (!joint_locations[hand].isActive) {
+			continue;
+		}
+
+		if (hand == 0) {
+			glUniform3f(color, 1.0, 0.5, 0.5);
+
+		} else if (hand == 1) {
+			glUniform3f(color, 0.5, 1.0, 0.5);
+		}
+
+		for (uint32_t i = 0; i < joint_locations[hand].jointCount; i++) {
+			struct XrHandJointLocationEXT* joint_location =
+			    &joint_locations[hand].jointLocations[i];
+
+			if (!(joint_location->locationFlags &
+			      XR_SPACE_LOCATION_POSITION_VALID_BIT)) {
+				continue;
+			}
+
+			float size = joint_location->radius;
+
+			XrMatrix4x4f joint_matrix;
+			XrVector3f uniformScale = {.x = size, .y = size, .z = size};
+			XrMatrix4x4f_CreateTranslationRotationScaleRotate(
+			    &joint_matrix, &joint_location->pose.position,
+			    &joint_location->pose.orientation, &uniformScale);
+			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (float*)joint_matrix.m);
+			glUniform3f(color, 0.5, 1.0, 0.5);
+			glDrawArrays(GL_TRIANGLES, 0, 36);
+		}
+	}
+
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
