@@ -482,10 +482,11 @@ init_openxr(xr_example* self)
 			    .handJointSet = XR_HAND_JOINT_SET_DEFAULT_EXT};
 			result = pfnCreateHandTrackerEXT(self->session, &hand_tracker_create_info,
 			                                 &self->hand_trackers[0]);
-			if (xr_result(self->instance, result,
-			              "Failed to create left hand tracker")) {
-				printf("Created hand tracker for left hand\n");
+			if (!xr_result(self->instance, result,
+			               "Failed to create left hand tracker")) {
+				return 1;
 			}
+			printf("Created hand tracker for left hand\n");
 		}
 		{
 			XrHandTrackerCreateInfoEXT hand_tracker_create_info = {
@@ -495,10 +496,11 @@ init_openxr(xr_example* self)
 			    .handJointSet = XR_HAND_JOINT_SET_DEFAULT_EXT};
 			result = pfnCreateHandTrackerEXT(self->session, &hand_tracker_create_info,
 			                                 &self->hand_trackers[1]);
-			if (xr_result(self->instance, result,
-			              "Failed to create right hand tracker")) {
-				printf("Created hand tracker for right hand\n");
+			if (!xr_result(self->instance, result,
+			               "Failed to create right hand tracker")) {
+				return 1;
 			}
+			printf("Created hand tracker for right hand\n");
 		}
 	}
 
