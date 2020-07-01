@@ -245,15 +245,18 @@ init_openxr(xr_example* self)
 	// checking system properties is optional, but if the hand tracking
 	// extension is supported, we do want to know if the system supports it.
 	{
-		XrSystemHandTrackingPropertiesEXT ht = {
-		    .type = XR_TYPE_SYSTEM_HAND_TRACKING_PROPERTIES_EXT, .next = NULL};
-
 		XrSystemProperties systemProperties = {
 		    .type = XR_TYPE_SYSTEM_PROPERTIES,
-		    .next = &ht,
+		    .next = NULL,
 		    .graphicsProperties = {0},
 		    .trackingProperties = {0},
 		};
+
+		XrSystemHandTrackingPropertiesEXT ht = {
+			.type = XR_TYPE_SYSTEM_HAND_TRACKING_PROPERTIES_EXT, .next = NULL};
+		if (hand_tracking_extension_supported) {
+			systemProperties.next = &ht;
+		}
 
 		result = xrGetSystemProperties(self->instance, systemId, &systemProperties);
 		if (!xr_result(self->instance, result, "Failed to get System properties"))
