@@ -1147,8 +1147,8 @@ main_loop(xr_example* self)
 		// resulting in individual values per hand/.
 		XrActionStateFloat grabValue[hands];
 		XrActionStateFloat leverValue[hands];
-		XrSpaceLocation spaceLocation[hands];
-		bool spaceLocationValid[hands];
+		XrSpaceLocation hand_locations[hands];
+		bool hand_locations_valid[hands];
 
 		for (int i = 0; i < hands; i++) {
 
@@ -1164,17 +1164,17 @@ main_loop(xr_example* self)
 			}
 			// printf("Hand pose %d active: %d\n", i, poseState.isActive);
 
-			spaceLocation[i].type = XR_TYPE_SPACE_LOCATION;
-			spaceLocation[i].next = NULL;
+			hand_locations[i].type = XR_TYPE_SPACE_LOCATION;
+			hand_locations[i].next = NULL;
 
 			result =
 			    xrLocateSpace(handSpaces[i], self->local_space,
-			                  frameState.predictedDisplayTime, &spaceLocation[i]);
+			                  frameState.predictedDisplayTime, &hand_locations[i]);
 			xr_result(self->instance, result, "failed to locate space %d!", i);
-			spaceLocationValid[i] =
+			hand_locations_valid[i] =
 			    //(spaceLocation[i].locationFlags &
-			    //XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 &&
-			    (spaceLocation[i].locationFlags &
+			    // XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 &&
+			    (hand_locations[i].locationFlags &
 			     XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0;
 
 			/*
@@ -1299,8 +1299,8 @@ main_loop(xr_example* self)
 
 			renderFrame(self->configuration_views[i].recommendedImageRectWidth,
 			            self->configuration_views[i].recommendedImageRectHeight,
-			            projectionMatrix, inverseViewMatrix, &spaceLocation[0],
-			            &spaceLocation[1], joint_locations,
+			            projectionMatrix, inverseViewMatrix, hand_locations,
+			            hand_locations_valid, joint_locations,
 			            self->framebuffers[i][bufferIndex], self->depthbuffer,
 			            self->images[i][bufferIndex], i,
 			            frameState.predictedDisplayTime);

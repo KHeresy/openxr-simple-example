@@ -213,8 +213,8 @@ renderFrame(int w,
             int h,
             XrMatrix4x4f projectionmatrix,
             XrMatrix4x4f viewmatrix,
-            XrSpaceLocation* leftHand,
-            XrSpaceLocation* rightHand,
+            XrSpaceLocation* hand_locations,
+            bool* hand_locations_valid,
             XrHandJointLocationsEXT* joint_locations,
             GLuint framebuffer,
             GLuint depthbuffer,
@@ -290,40 +290,29 @@ renderFrame(int w,
 	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (float*)modelmatrix_right.m);
 	glDrawArrays(GL_TRIANGLES, 0, 36);
 
-
-	// controllers
-	if (leftHand) {
-		XrMatrix4x4f leftMatrix;
-		XrVector3f uniformScale = {.x = .05f, .y = .05f, .z = .2f};
-		XrMatrix4x4f_CreateTranslationRotationScaleRotate(
-		    &leftMatrix, &leftHand->pose.position, &leftHand->pose.orientation,
-		    &uniformScale);
-		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (float*)leftMatrix.m);
-		glUniform3f(color, 1.0, 0.5, 0.5);
-		glDrawArrays(GL_TRIANGLES, 0, 36);
-	}
-
-	if (rightHand) {
-		XrMatrix4x4f rightMatrix;
-		XrVector3f uniformScale = {.x = .05f, .y = .05f, .z = .2f};
-		XrMatrix4x4f_CreateTranslationRotationScaleRotate(
-		    &rightMatrix, &rightHand->pose.position, &rightHand->pose.orientation,
-		    &uniformScale);
-		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (float*)rightMatrix.m);
-		glUniform3f(color, 0.5, 1.0, 0.5);
-		glDrawArrays(GL_TRIANGLES, 0, 36);
-	}
-
 	for (int hand = 0; hand < 2; hand++) {
-		if (!joint_locations[hand].isActive) {
-			continue;
-		}
-
 		if (hand == 0) {
 			glUniform3f(color, 1.0, 0.5, 0.5);
-
-		} else if (hand == 1) {
+		} else {
 			glUniform3f(color, 0.5, 1.0, 0.5);
+		}
+
+		// draw blocks for controller locations if hand tracking is not
+		// available
+		if (!joint_locations[hand].isActive) {
+
+			if (!hand_locations_valid[hand])
+				continue;
+
+			XrMatrix4x4f matrix;
+			XrVector3f uniformScale = {.x = .05f, .y = .05f, .z = .2f};
+			XrMatrix4x4f_CreateTranslationRotationScaleRotate(
+			    &matrix, &hand_locations[hand].pose.position,
+			    &hand_locations[hand].pose.orientation, &uniformScale);
+			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (float*)matrix.m);
+
+			glDrawArrays(GL_TRIANGLES, 0, 36);
+			continue;
 		}
 
 		for (uint32_t i = 0; i < joint_locations[hand].jointCount; i++) {
@@ -343,7 +332,6 @@ renderFrame(int w,
 			    &joint_matrix, &joint_location->pose.position,
 			    &joint_location->pose.orientation, &uniformScale);
 			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (float*)joint_matrix.m);
-			glUniform3f(color, 0.5, 1.0, 0.5);
 			glDrawArrays(GL_TRIANGLES, 0, 36);
 		}
 	}
