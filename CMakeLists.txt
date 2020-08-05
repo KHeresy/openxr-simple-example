@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 2.6)
 project(openxr-example)
 
+if (POLICY CMP0072)
+  cmake_policy (SET CMP0072 NEW)
+endif(POLICY CMP0072)
+
 find_package(X11 REQUIRED)
 find_package(OpenGL REQUIRED)
 
