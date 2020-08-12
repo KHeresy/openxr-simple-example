@@ -67,13 +67,15 @@ xr_result(XrInstance instance, XrResult result, const char* format, ...)
 
 	size_t len1 = strlen(format);
 	size_t len2 = strlen(resultString) + 1;
-	char formatRes[len1 + len2 + 4]; // + " []\n"
+	char *formatRes = malloc (sizeof(char) * (len1 + len2 + 4)); // + " []\n"
 	sprintf(formatRes, "%s [%s]\n", format, resultString);
 
 	va_list args;
 	va_start(args, format);
 	vprintf(formatRes, args);
 	va_end(args);
+
+	free(formatRes);
 	return false;
 }
 
