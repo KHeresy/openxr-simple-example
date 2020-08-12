@@ -258,8 +258,7 @@ mat4_t
 m4_rotation(float angle_in_rad, vec3_t axis);
 
 mat4_t
-m4_ortho(
-    float left, float right, float bottom, float top, float back, float front);
+m4_ortho(float left, float right, float bottom, float top, float back, float front);
 mat4_t
 m4_perspective(float vertical_field_of_view_in_deg,
                float aspect_ratio,
@@ -313,8 +312,7 @@ v3_proj(vec3_t v, vec3_t onto)
 static inline vec3_t
 v3_cross(vec3_t a, vec3_t b)
 {
-	return (vec3_t){a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z,
-	                a.x * b.y - a.y * b.x};
+	return (vec3_t){a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x};
 }
 
 static inline float
@@ -394,8 +392,7 @@ m4_identity()
 static inline mat4_t
 m4_translation(vec3_t offset)
 {
-	return mat4(1, 0, 0, offset.x, 0, 1, 0, offset.y, 0, 0, 1, offset.z, 0, 0, 0,
-	            1);
+	return mat4(1, 0, 0, offset.x, 0, 1, 0, offset.y, 0, 0, 1, offset.z, 0, 0, 0, 1);
 }
 
 static inline mat4_t
@@ -429,10 +426,9 @@ m4_rotation_z(float angle_in_rad)
 static inline mat4_t
 m4_transpose(mat4_t matrix)
 {
-	return mat4(matrix.m00, matrix.m01, matrix.m02, matrix.m03, matrix.m10,
-	            matrix.m11, matrix.m12, matrix.m13, matrix.m20, matrix.m21,
-	            matrix.m22, matrix.m23, matrix.m30, matrix.m31, matrix.m32,
-	            matrix.m33);
+	return mat4(matrix.m00, matrix.m01, matrix.m02, matrix.m03, matrix.m10, matrix.m11, matrix.m12,
+	            matrix.m13, matrix.m20, matrix.m21, matrix.m22, matrix.m23, matrix.m30, matrix.m31,
+	            matrix.m32, matrix.m33);
 }
 
 /**
@@ -483,11 +479,9 @@ m4_rotation(float angle_in_rad, vec3_t axis)
 	float x = normalized_axis.x, y = normalized_axis.y, z = normalized_axis.z;
 	float c = cosf(angle_in_rad), s = sinf(angle_in_rad);
 
-	return mat4(c + x * x * (1 - c), x * y * (1 - c) - z * s,
-	            x * z * (1 - c) + y * s, 0, y * x * (1 - c) + z * s,
-	            c + y * y * (1 - c), y * z * (1 - c) - x * s, 0,
-	            z * x * (1 - c) - y * s, z * y * (1 - c) + x * s,
-	            c + z * z * (1 - c), 0, 0, 0, 0, 1);
+	return mat4(c + x * x * (1 - c), x * y * (1 - c) - z * s, x * z * (1 - c) + y * s, 0,
+	            y * x * (1 - c) + z * s, c + y * y * (1 - c), y * z * (1 - c) - x * s, 0,
+	            z * x * (1 - c) - y * s, z * y * (1 - c) + x * s, c + z * z * (1 - c), 0, 0, 0, 0, 1);
 }
 
 
@@ -519,15 +513,13 @@ m4_rotation(float angle_in_rad, vec3_t axis)
  * https://unspecified.wordpress.com/2012/06/21/calculating-the-gluperspective-matrix-and-other-opengl-matrix-maths/
  */
 mat4_t
-m4_ortho(
-    float left, float right, float bottom, float top, float back, float front)
+m4_ortho(float left, float right, float bottom, float top, float back, float front)
 {
 	float l = left, r = right, b = bottom, t = top, n = front, f = back;
 	float tx = -(r + l) / (r - l);
 	float ty = -(t + b) / (t - b);
 	float tz = -(f + n) / (f - n);
-	return mat4(2 / (r - l), 0, 0, tx, 0, 2 / (t - b), 0, ty, 0, 0, 2 / (f - n),
-	            tz, 0, 0, 0, 1);
+	return mat4(2 / (r - l), 0, 0, tx, 0, 2 / (t - b), 0, ty, 0, 0, 2 / (f - n), tz, 0, 0, 0, 1);
 }
 
 /**
@@ -561,8 +553,8 @@ m4_perspective(float vertical_field_of_view_in_deg,
 	float ar = aspect_ratio;
 	float nd = near_view_distance, fd = far_view_distance;
 
-	return mat4(f / ar, 0, 0, 0, 0, f, 0, 0, 0, 0, (fd + nd) / (nd - fd),
-	            (2 * fd * nd) / (nd - fd), 0, 0, -1, 0);
+	return mat4(f / ar, 0, 0, 0, 0, f, 0, 0, 0, 0, (fd + nd) / (nd - fd), (2 * fd * nd) / (nd - fd),
+	            0, 0, -1, 0);
 }
 
 /**
@@ -608,8 +600,8 @@ m4_look_at(vec3_t from, vec3_t to, vec3_t up)
 	vec3_t x = v3_norm(v3_cross(up, z));
 	vec3_t y = v3_cross(z, x);
 
-	return mat4(x.x, x.y, x.z, -v3_dot(from, x), y.x, y.y, y.z, -v3_dot(from, y),
-	            z.x, z.y, z.z, -v3_dot(from, z), 0, 0, 0, 1);
+	return mat4(x.x, x.y, x.z, -v3_dot(from, x), y.x, y.y, y.z, -v3_dot(from, y), z.x, z.y, z.z,
+	            -v3_dot(from, z), 0, 0, 0, 1);
 }
 
 
@@ -655,12 +647,9 @@ m4_invert_affine(mat4_t matrix)
 	// That part is called R from here on.
 
 	// Calculate cofactor matrix of R
-	float c00 = m11 * m22 - m12 * m21, c10 = -(m01 * m22 - m02 * m21),
-	      c20 = m01 * m12 - m02 * m11;
-	float c01 = -(m10 * m22 - m12 * m20), c11 = m00 * m22 - m02 * m20,
-	      c21 = -(m00 * m12 - m02 * m10);
-	float c02 = m10 * m21 - m11 * m20, c12 = -(m00 * m21 - m01 * m20),
-	      c22 = m00 * m11 - m01 * m10;
+	float c00 = m11 * m22 - m12 * m21, c10 = -(m01 * m22 - m02 * m21), c20 = m01 * m12 - m02 * m11;
+	float c01 = -(m10 * m22 - m12 * m20), c11 = m00 * m22 - m02 * m20, c21 = -(m00 * m12 - m02 * m10);
+	float c02 = m10 * m21 - m11 * m20, c12 = -(m00 * m21 - m01 * m20), c22 = m00 * m11 - m01 * m10;
 
 	// Caclculate the determinant by using the already calculated
 	// determinants in the cofactor matrix. Second sign is already minus
@@ -676,8 +665,8 @@ m4_invert_affine(mat4_t matrix)
 	float i02 = c20 / det, i12 = c21 / det, i22 = c22 / det;
 
 	// Combine the inverted R with the inverted translation
-	return mat4(i00, i10, i20, -(i00 * m30 + i10 * m31 + i20 * m32), i01, i11,
-	            i21, -(i01 * m30 + i11 * m31 + i21 * m32), i02, i12, i22,
+	return mat4(i00, i10, i20, -(i00 * m30 + i10 * m31 + i20 * m32), i01, i11, i21,
+	            -(i01 * m30 + i11 * m31 + i21 * m32), i02, i12, i22,
 	            -(i02 * m30 + i12 * m31 + i22 * m32), 0, 0, 0, 1);
 }
 
@@ -691,15 +680,13 @@ m4_invert_affine(mat4_t matrix)
 vec3_t
 m4_mul_pos(mat4_t matrix, vec3_t position)
 {
-	vec3_t result = vec3(matrix.m00 * position.x + matrix.m10 * position.y +
-	                         matrix.m20 * position.z + matrix.m30,
-	                     matrix.m01 * position.x + matrix.m11 * position.y +
-	                         matrix.m21 * position.z + matrix.m31,
-	                     matrix.m02 * position.x + matrix.m12 * position.y +
-	                         matrix.m22 * position.z + matrix.m32);
+	vec3_t result = vec3(
+	    matrix.m00 * position.x + matrix.m10 * position.y + matrix.m20 * position.z + matrix.m30,
+	    matrix.m01 * position.x + matrix.m11 * position.y + matrix.m21 * position.z + matrix.m31,
+	    matrix.m02 * position.x + matrix.m12 * position.y + matrix.m22 * position.z + matrix.m32);
 
-	float w = matrix.m03 * position.x + matrix.m13 * position.y +
-	          matrix.m23 * position.z + matrix.m33;
+	float w =
+	    matrix.m03 * position.x + matrix.m13 * position.y + matrix.m23 * position.z + matrix.m33;
 	if (w != 0 && w != 1)
 		return vec3(result.x / w, result.y / w, result.z / w);
 
@@ -721,15 +708,12 @@ m4_mul_pos(mat4_t matrix, vec3_t position)
 vec3_t
 m4_mul_dir(mat4_t matrix, vec3_t direction)
 {
-	vec3_t result = vec3(matrix.m00 * direction.x + matrix.m10 * direction.y +
-	                         matrix.m20 * direction.z,
-	                     matrix.m01 * direction.x + matrix.m11 * direction.y +
-	                         matrix.m21 * direction.z,
-	                     matrix.m02 * direction.x + matrix.m12 * direction.y +
-	                         matrix.m22 * direction.z);
+	vec3_t result =
+	    vec3(matrix.m00 * direction.x + matrix.m10 * direction.y + matrix.m20 * direction.z,
+	         matrix.m01 * direction.x + matrix.m11 * direction.y + matrix.m21 * direction.z,
+	         matrix.m02 * direction.x + matrix.m12 * direction.y + matrix.m22 * direction.z);
 
-	float w = matrix.m03 * direction.x + matrix.m13 * direction.y +
-	          matrix.m23 * direction.z;
+	float w = matrix.m03 * direction.x + matrix.m13 * direction.y + matrix.m23 * direction.z;
 	if (w != 0 && w != 1)
 		return vec3(result.x / w, result.y / w, result.z / w);
 
@@ -760,8 +744,8 @@ m4_fprintp(FILE* stream, mat4_t matrix, int width, int precision)
 	mat4_t m = matrix;
 	int w = width, p = precision;
 	for (int r = 0; r < 4; r++) {
-		fprintf(stream, "| %*.*f %*.*f %*.*f %*.*f |\n", w, p, m.m[0][r], w, p,
-		        m.m[1][r], w, p, m.m[2][r], w, p, m.m[3][r]);
+		fprintf(stream, "| %*.*f %*.*f %*.*f %*.*f |\n", w, p, m.m[0][r], w, p, m.m[1][r], w, p,
+		        m.m[2][r], w, p, m.m[3][r]);
 	}
 }
 

@@ -82,9 +82,8 @@ initGLX(Display** xDisplay,
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 0);
 
 	/* Create our window centered at half the VR resolution */
-	mainwindow = SDL_CreateWindow("OpenXR Example", SDL_WINDOWPOS_CENTERED,
-	                              SDL_WINDOWPOS_CENTERED, w / 2, h / 2,
-	                              SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
+	mainwindow = SDL_CreateWindow("OpenXR Example", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+	                              w / 2, h / 2, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
 	if (!mainwindow) {
 		printf("Unable to create window");
 		return false;
@@ -94,8 +93,8 @@ initGLX(Display** xDisplay,
 
 	SDL_GL_SetSwapInterval(0);
 
-	_glBlitNamedFramebuffer = (PFNGLBLITNAMEDFRAMEBUFFERPROC)glXGetProcAddressARB(
-	    (GLubyte*)"glBlitNamedFramebuffer");
+	_glBlitNamedFramebuffer =
+	    (PFNGLBLITNAMEDFRAMEBUFFERPROC)glXGetProcAddressARB((GLubyte*)"glBlitNamedFramebuffer");
 
 	// HACK? OpenXR wants us to report these values, so "work around" SDL a
 	// bit and get the underlying glx stuff. Does this still work when e.g.
@@ -162,30 +161,29 @@ initGlImpl()
 	glDeleteShader(vertexShaderId);
 	glDeleteShader(fragmentShaderId);
 
-	float vertices[] = {
-	    -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 0.5f,  -0.5f, -0.5f, 1.0f, 0.0f,
-	    0.5f,  0.5f,  -0.5f, 1.0f, 1.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
-	    -0.5f, 0.5f,  -0.5f, 0.0f, 1.0f, -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
+	float vertices[] = {-0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 0.5f,  -0.5f, -0.5f, 1.0f, 0.0f,
+	                    0.5f,  0.5f,  -0.5f, 1.0f, 1.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
+	                    -0.5f, 0.5f,  -0.5f, 0.0f, 1.0f, -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
 
-	    -0.5f, -0.5f, 0.5f,  0.0f, 0.0f, 0.5f,  -0.5f, 0.5f,  1.0f, 0.0f,
-	    0.5f,  0.5f,  0.5f,  1.0f, 1.0f, 0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-	    -0.5f, 0.5f,  0.5f,  0.0f, 1.0f, -0.5f, -0.5f, 0.5f,  0.0f, 0.0f,
+	                    -0.5f, -0.5f, 0.5f,  0.0f, 0.0f, 0.5f,  -0.5f, 0.5f,  1.0f, 0.0f,
+	                    0.5f,  0.5f,  0.5f,  1.0f, 1.0f, 0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+	                    -0.5f, 0.5f,  0.5f,  0.0f, 1.0f, -0.5f, -0.5f, 0.5f,  0.0f, 0.0f,
 
-	    -0.5f, 0.5f,  0.5f,  1.0f, 0.0f, -0.5f, 0.5f,  -0.5f, 1.0f, 1.0f,
-	    -0.5f, -0.5f, -0.5f, 0.0f, 1.0f, -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
-	    -0.5f, -0.5f, 0.5f,  0.0f, 0.0f, -0.5f, 0.5f,  0.5f,  1.0f, 0.0f,
+	                    -0.5f, 0.5f,  0.5f,  1.0f, 0.0f, -0.5f, 0.5f,  -0.5f, 1.0f, 1.0f,
+	                    -0.5f, -0.5f, -0.5f, 0.0f, 1.0f, -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+	                    -0.5f, -0.5f, 0.5f,  0.0f, 0.0f, -0.5f, 0.5f,  0.5f,  1.0f, 0.0f,
 
-	    0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
-	    0.5f,  -0.5f, -0.5f, 0.0f, 1.0f, 0.5f,  -0.5f, -0.5f, 0.0f, 1.0f,
-	    0.5f,  -0.5f, 0.5f,  0.0f, 0.0f, 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+	                    0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
+	                    0.5f,  -0.5f, -0.5f, 0.0f, 1.0f, 0.5f,  -0.5f, -0.5f, 0.0f, 1.0f,
+	                    0.5f,  -0.5f, 0.5f,  0.0f, 0.0f, 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
 
-	    -0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.5f,  -0.5f, -0.5f, 1.0f, 1.0f,
-	    0.5f,  -0.5f, 0.5f,  1.0f, 0.0f, 0.5f,  -0.5f, 0.5f,  1.0f, 0.0f,
-	    -0.5f, -0.5f, 0.5f,  0.0f, 0.0f, -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+	                    -0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.5f,  -0.5f, -0.5f, 1.0f, 1.0f,
+	                    0.5f,  -0.5f, 0.5f,  1.0f, 0.0f, 0.5f,  -0.5f, 0.5f,  1.0f, 0.0f,
+	                    -0.5f, -0.5f, 0.5f,  0.0f, 0.0f, -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
 
-	    -0.5f, 0.5f,  -0.5f, 0.0f, 1.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
-	    0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-	    -0.5f, 0.5f,  0.5f,  0.0f, 0.0f, -0.5f, 0.5f,  -0.5f, 0.0f, 1.0f};
+	                    -0.5f, 0.5f,  -0.5f, 0.0f, 1.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
+	                    0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+	                    -0.5f, 0.5f,  0.5f,  0.0f, 0.0f, -0.5f, 0.5f,  -0.5f, 0.0f, 1.0f};
 
 	GLuint VBOs[1];
 	glGenBuffers(1, VBOs);
@@ -199,8 +197,7 @@ initGlImpl()
 	glEnableVertexAttribArray(0);
 
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
-	glVertexAttribPointer(5, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
-	                      (void*)(3 * sizeof(float)));
+	glVertexAttribPointer(5, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
 	glEnableVertexAttribArray(5);
 
 	glEnable(GL_DEPTH_TEST);
@@ -228,10 +225,8 @@ renderFrame(int w,
 	glViewport(0, 0, w, h);
 	glScissor(0, 0, w, h);
 
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-	                       image.image, 0);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D,
-	                       depthbuffer, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, image.image, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthbuffer, 0);
 
 	glClearColor(.0f, 0.0f, 0.2f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -239,24 +234,18 @@ renderFrame(int w,
 	float cubedist = 1.5f;
 	float cubescale = 0.33f;
 	float cubeele = .5f;
-	mat4_t modelmatrix_front =
-	    m4_mul(m4_translation(vec3(0.0f, cubeele, -cubedist)),
-	           m4_scaling(vec3(cubescale, cubescale, cubescale)));
-	mat4_t modelmatrix_back =
-	    m4_mul(m4_translation(vec3(0.0f, cubeele, cubedist)),
-	           m4_scaling(vec3(cubescale, cubescale, cubescale)));
-	mat4_t modelmatrix_left =
-	    m4_mul(m4_translation(vec3(-cubedist, cubeele, 0.0f)),
-	           m4_scaling(vec3(cubescale, cubescale, cubescale)));
-	mat4_t modelmatrix_right =
-	    m4_mul(m4_translation(vec3(cubedist, cubeele, 0.0f)),
-	           m4_scaling(vec3(cubescale, cubescale, cubescale)));
+	mat4_t modelmatrix_front = m4_mul(m4_translation(vec3(0.0f, cubeele, -cubedist)),
+	                                  m4_scaling(vec3(cubescale, cubescale, cubescale)));
+	mat4_t modelmatrix_back = m4_mul(m4_translation(vec3(0.0f, cubeele, cubedist)),
+	                                 m4_scaling(vec3(cubescale, cubescale, cubescale)));
+	mat4_t modelmatrix_left = m4_mul(m4_translation(vec3(-cubedist, cubeele, 0.0f)),
+	                                 m4_scaling(vec3(cubescale, cubescale, cubescale)));
+	mat4_t modelmatrix_right = m4_mul(m4_translation(vec3(cubedist, cubeele, 0.0f)),
+	                                  m4_scaling(vec3(cubescale, cubescale, cubescale)));
 
-	double displaytimeSeconds =
-	    ((double)predictedDisplayTime) / (1000. * 1000. * 1000.);
+	double displaytimeSeconds = ((double)predictedDisplayTime) / (1000. * 1000. * 1000.);
 	const float rotations_per_sec = .25;
-	float rotation =
-	    ((long)(displaytimeSeconds * 360. * rotations_per_sec)) % 360;
+	float rotation = ((long)(displaytimeSeconds * 360. * rotations_per_sec)) % 360;
 	mat4_t rotationmatrix = m4_rotation_y(degreesToRadians(rotation));
 	modelmatrix_front = m4_mul(modelmatrix_front, rotationmatrix);
 	modelmatrix_back = m4_mul(modelmatrix_back, rotationmatrix);
@@ -307,8 +296,8 @@ renderFrame(int w,
 			XrMatrix4x4f matrix;
 			XrVector3f uniformScale = {.x = .05f, .y = .05f, .z = .2f};
 			XrMatrix4x4f_CreateTranslationRotationScaleRotate(
-			    &matrix, &hand_locations[hand].pose.position,
-			    &hand_locations[hand].pose.orientation, &uniformScale);
+			    &matrix, &hand_locations[hand].pose.position, &hand_locations[hand].pose.orientation,
+			    &uniformScale);
 			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (float*)matrix.m);
 
 			glDrawArrays(GL_TRIANGLES, 0, 36);
@@ -316,11 +305,9 @@ renderFrame(int w,
 		}
 
 		for (uint32_t i = 0; i < joint_locations[hand].jointCount; i++) {
-			struct XrHandJointLocationEXT* joint_location =
-			    &joint_locations[hand].jointLocations[i];
+			struct XrHandJointLocationEXT* joint_location = &joint_locations[hand].jointLocations[i];
 
-			if (!(joint_location->locationFlags &
-			      XR_SPACE_LOCATION_POSITION_VALID_BIT)) {
+			if (!(joint_location->locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT)) {
 				continue;
 			}
 
@@ -329,8 +316,8 @@ renderFrame(int w,
 			XrMatrix4x4f joint_matrix;
 			XrVector3f uniformScale = {.x = size, .y = size, .z = size};
 			XrMatrix4x4f_CreateTranslationRotationScaleRotate(
-			    &joint_matrix, &joint_location->pose.position,
-			    &joint_location->pose.orientation, &uniformScale);
+			    &joint_matrix, &joint_location->pose.position, &joint_location->pose.orientation,
+			    &uniformScale);
 			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (float*)joint_matrix.m);
 			glDrawArrays(GL_TRIANGLES, 0, 36);
 		}
@@ -340,16 +327,16 @@ renderFrame(int w,
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	if (viewIndex == 0) {
-		_glBlitNamedFramebuffer((GLuint)framebuffer, // readFramebuffer
-		                        (GLuint)0,    // backbuffer     // drawFramebuffer
-		                        (GLint)0,     // srcX0
-		                        (GLint)0,     // srcY0
-		                        (GLint)w,     // srcX1
-		                        (GLint)h,     // srcY1
-		                        (GLint)0,     // dstX0
-		                        (GLint)0,     // dstY0
-		                        (GLint)w / 2, // dstX1
-		                        (GLint)h / 2, // dstY1
+		_glBlitNamedFramebuffer((GLuint)framebuffer,             // readFramebuffer
+		                        (GLuint)0,                       // backbuffer     // drawFramebuffer
+		                        (GLint)0,                        // srcX0
+		                        (GLint)0,                        // srcY0
+		                        (GLint)w,                        // srcX1
+		                        (GLint)h,                        // srcY1
+		                        (GLint)0,                        // dstX0
+		                        (GLint)0,                        // dstY0
+		                        (GLint)w / 2,                    // dstX1
+		                        (GLint)h / 2,                    // dstY1
 		                        (GLbitfield)GL_COLOR_BUFFER_BIT, // mask
 		                        (GLenum)GL_LINEAR);              // filter
 

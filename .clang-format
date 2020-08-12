@@ -23,7 +23,7 @@ IndentCaseLabels: false
 NamespaceIndentation: Inner
 
 # Line length/reflow
-ColumnLimit:          80
+ColumnLimit:          100
 ReflowComments:       true
 
 
