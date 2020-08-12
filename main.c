@@ -253,7 +253,7 @@ init_openxr(xr_example* self)
 		};
 
 		XrSystemHandTrackingPropertiesEXT ht = {
-			.type = XR_TYPE_SYSTEM_HAND_TRACKING_PROPERTIES_EXT, .next = NULL};
+		    .type = XR_TYPE_SYSTEM_HAND_TRACKING_PROPERTIES_EXT, .next = NULL};
 		if (hand_tracking_extension_supported) {
 			systemProperties.next = &ht;
 		}
