@@ -15,12 +15,6 @@
 
 #define MATH_3D_IMPLEMENTATION
 #include "math_3d.h"
-
-#define GL_GLEXT_PROTOTYPES
-#define GL3_PROTOTYPES
-#include <GL/gl.h>
-#include <GL/glext.h>
-
 #include "glimpl.h"
 
 GLuint shaderProgramID = 0;
@@ -53,21 +47,34 @@ static const char* fragmentshader =
     "1.0);\n"
     "}\n";
 
-static SDL_Window* mainwindow;
-static SDL_GLContext maincontext;
+static SDL_Window* desktop_window;
+static SDL_GLContext gl_context;
 
 // don't need a gl loader for just one function, just load it ourselves'
 PFNGLBLITNAMEDFRAMEBUFFERPROC _glBlitNamedFramebuffer;
 
+void GLAPIENTRY
+MessageCallback(GLenum source,
+                GLenum type,
+                GLuint id,
+                GLenum severity,
+                GLsizei length,
+                const GLchar* message,
+                const void* userParam)
+{
+	fprintf(stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
+	        (type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""), type, severity, message);
+}
+
 #ifdef __linux__
 bool
-initGLX(Display** xDisplay,
-        uint32_t* visualid,
-        GLXFBConfig* glxFBConfig,
-        GLXDrawable* glxDrawable,
-        GLXContext* glxContext,
-        int w,
-        int h)
+init_sdl_window(Display** xDisplay,
+                uint32_t* visualid,
+                GLXFBConfig* glxFBConfig,
+                GLXDrawable* glxDrawable,
+                GLXContext* glxContext,
+                int w,
+                int h)
 {
 
 	if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -81,15 +88,22 @@ initGLX(Display** xDisplay,
 
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 0);
 
+
 	/* Create our window centered at half the VR resolution */
-	mainwindow = SDL_CreateWindow("OpenXR Example", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-	                              w / 2, h / 2, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
-	if (!mainwindow) {
+	desktop_window =
+	    SDL_CreateWindow("OpenXR Example", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w / 2,
+	                     h / 2, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
+	if (!desktop_window) {
 		printf("Unable to create window");
 		return false;
 	}
 
-	maincontext = SDL_GL_CreateContext(mainwindow);
+	gl_context = SDL_GL_CreateContext(desktop_window);
+
+	/*
+	glEnable(GL_DEBUG_OUTPUT);
+	glDebugMessageCallback(MessageCallback, 0);
+	*/
 
 	SDL_GL_SetSwapInterval(0);
 
@@ -108,58 +122,58 @@ initGLX(Display** xDisplay,
 #endif
 
 int
-initGlImpl()
+init_gl()
 {
-	GLuint vertexShaderId = glCreateShader(GL_VERTEX_SHADER);
-	const GLchar* vertexShaderSource[1];
-	vertexShaderSource[0] = vertexshader;
+	GLuint vertex_shader_id = glCreateShader(GL_VERTEX_SHADER);
+	const GLchar* vertex_shader_source[1];
+	vertex_shader_source[0] = vertexshader;
 	// printf("Vertex Shader:\n%s\n", vertexShaderSource);
-	glShaderSource(vertexShaderId, 1, vertexShaderSource, NULL);
-	glCompileShader(vertexShaderId);
-	int vertexcompilesuccess;
-	glGetShaderiv(vertexShaderId, GL_COMPILE_STATUS, &vertexcompilesuccess);
-	if (!vertexcompilesuccess) {
-		char infoLog[512];
-		glGetShaderInfoLog(vertexShaderId, 512, NULL, infoLog);
-		printf("Vertex Shader failed to compile: %s\n", infoLog);
+	glShaderSource(vertex_shader_id, 1, vertex_shader_source, NULL);
+	glCompileShader(vertex_shader_id);
+	int vertex_compile_res;
+	glGetShaderiv(vertex_shader_id, GL_COMPILE_STATUS, &vertex_compile_res);
+	if (!vertex_compile_res) {
+		char info_log[512];
+		glGetShaderInfoLog(vertex_shader_id, 512, NULL, info_log);
+		printf("Vertex Shader failed to compile: %s\n", info_log);
 		return 1;
 	} else {
 		printf("Successfully compiled vertex shader!\n");
 	}
 
-	GLuint fragmentShaderId = glCreateShader(GL_FRAGMENT_SHADER);
-	const GLchar* fragmentShaderSource[1];
-	fragmentShaderSource[0] = fragmentshader;
-	glShaderSource(fragmentShaderId, 1, fragmentShaderSource, NULL);
-	glCompileShader(fragmentShaderId);
-	int fragmentcompilesuccess;
-	glGetShaderiv(fragmentShaderId, GL_COMPILE_STATUS, &fragmentcompilesuccess);
-	if (!fragmentcompilesuccess) {
-		char infoLog[512];
-		glGetShaderInfoLog(fragmentShaderId, 512, NULL, infoLog);
-		printf("Fragment Shader failed to compile: %s\n", infoLog);
+	GLuint fragment_shader_id = glCreateShader(GL_FRAGMENT_SHADER);
+	const GLchar* fragment_shader_source[1];
+	fragment_shader_source[0] = fragmentshader;
+	glShaderSource(fragment_shader_id, 1, fragment_shader_source, NULL);
+	glCompileShader(fragment_shader_id);
+	int fragment_compile_res;
+	glGetShaderiv(fragment_shader_id, GL_COMPILE_STATUS, &fragment_compile_res);
+	if (!fragment_compile_res) {
+		char info_log[512];
+		glGetShaderInfoLog(fragment_shader_id, 512, NULL, info_log);
+		printf("Fragment Shader failed to compile: %s\n", info_log);
 		return 1;
 	} else {
 		printf("Successfully compiled fragment shader!\n");
 	}
 
 	shaderProgramID = glCreateProgram();
-	glAttachShader(shaderProgramID, vertexShaderId);
-	glAttachShader(shaderProgramID, fragmentShaderId);
+	glAttachShader(shaderProgramID, vertex_shader_id);
+	glAttachShader(shaderProgramID, fragment_shader_id);
 	glLinkProgram(shaderProgramID);
-	GLint shaderprogramsuccess;
-	glGetProgramiv(shaderProgramID, GL_LINK_STATUS, &shaderprogramsuccess);
-	if (!shaderprogramsuccess) {
-		char infoLog[512];
-		glGetProgramInfoLog(shaderProgramID, 512, NULL, infoLog);
-		printf("Shader Program failed to link: %s\n", infoLog);
+	GLint shader_program_res;
+	glGetProgramiv(shaderProgramID, GL_LINK_STATUS, &shader_program_res);
+	if (!shader_program_res) {
+		char info_log[512];
+		glGetProgramInfoLog(shaderProgramID, 512, NULL, info_log);
+		printf("Shader Program failed to link: %s\n", info_log);
 		return 1;
 	} else {
 		printf("Successfully linked shader program!\n");
 	}
 
-	glDeleteShader(vertexShaderId);
-	glDeleteShader(fragmentShaderId);
+	glDeleteShader(vertex_shader_id);
+	glDeleteShader(fragment_shader_id);
 
 	float vertices[] = {-0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 0.5f,  -0.5f, -0.5f, 1.0f, 0.0f,
 	                    0.5f,  0.5f,  -0.5f, 1.0f, 1.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
@@ -206,51 +220,14 @@ initGlImpl()
 }
 
 void
-renderFrame(int w,
-            int h,
-            XrMatrix4x4f projectionmatrix,
-            XrMatrix4x4f viewmatrix,
-            XrSpaceLocation* hand_locations,
-            bool* hand_locations_valid,
-            XrHandJointLocationsEXT* joint_locations,
-            GLuint framebuffer,
-            GLuint depthbuffer,
-            XrSwapchainImageOpenGLKHR image,
-            int viewIndex,
-            XrTime predictedDisplayTime)
+render_cube(
+    vec3_t position, float scale, float rotation, float* view_matrix, float* projection_matrix)
 {
 
-	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+	mat4_t modelmatrix = m4_mul(m4_translation(position), m4_scaling(vec3(scale, scale, scale)));
 
-	glViewport(0, 0, w, h);
-	glScissor(0, 0, w, h);
-
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, image.image, 0);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthbuffer, 0);
-
-	glClearColor(.0f, 0.0f, 0.2f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	float cubedist = 1.5f;
-	float cubescale = 0.33f;
-	float cubeele = .5f;
-	mat4_t modelmatrix_front = m4_mul(m4_translation(vec3(0.0f, cubeele, -cubedist)),
-	                                  m4_scaling(vec3(cubescale, cubescale, cubescale)));
-	mat4_t modelmatrix_back = m4_mul(m4_translation(vec3(0.0f, cubeele, cubedist)),
-	                                 m4_scaling(vec3(cubescale, cubescale, cubescale)));
-	mat4_t modelmatrix_left = m4_mul(m4_translation(vec3(-cubedist, cubeele, 0.0f)),
-	                                 m4_scaling(vec3(cubescale, cubescale, cubescale)));
-	mat4_t modelmatrix_right = m4_mul(m4_translation(vec3(cubedist, cubeele, 0.0f)),
-	                                  m4_scaling(vec3(cubescale, cubescale, cubescale)));
-
-	double displaytimeSeconds = ((double)predictedDisplayTime) / (1000. * 1000. * 1000.);
-	const float rotations_per_sec = .25;
-	float rotation = ((long)(displaytimeSeconds * 360. * rotations_per_sec)) % 360;
 	mat4_t rotationmatrix = m4_rotation_y(degreesToRadians(rotation));
-	modelmatrix_front = m4_mul(modelmatrix_front, rotationmatrix);
-	modelmatrix_back = m4_mul(modelmatrix_back, rotationmatrix);
-	modelmatrix_left = m4_mul(modelmatrix_left, rotationmatrix);
-	modelmatrix_right = m4_mul(modelmatrix_right, rotationmatrix);
+	modelmatrix = m4_mul(modelmatrix, rotationmatrix);
 
 	glUseProgram(shaderProgramID);
 	glBindVertexArray(VAOs[0]);
@@ -262,23 +239,67 @@ renderFrame(int w,
 	glUniform3f(color, 0.0, 0.0, 0.0);
 
 	int viewLoc = glGetUniformLocation(shaderProgramID, "view");
+	glUniformMatrix4fv(viewLoc, 1, GL_FALSE, view_matrix);
+	int projLoc = glGetUniformLocation(shaderProgramID, "proj");
+	glUniformMatrix4fv(projLoc, 1, GL_FALSE, projection_matrix);
+
+	int modelLoc = glGetUniformLocation(shaderProgramID, "model");
+	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (float*)modelmatrix.m);
+	glDrawArrays(GL_TRIANGLES, 0, 36);
+}
+
+void
+render_frame(int w,
+             int h,
+             XrMatrix4x4f projectionmatrix,
+             XrMatrix4x4f viewmatrix,
+             XrSpaceLocation* hand_locations,
+             bool* hand_locations_valid,
+             XrHandJointLocationsEXT* joint_locations,
+             GLuint framebuffer,
+             GLuint depthbuffer,
+             XrSwapchainImageOpenGLKHR image,
+             int view_index,
+             XrTime predictedDisplayTime)
+{
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+
+	glViewport(0, 0, w, h);
+	glScissor(0, 0, w, h);
+
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, image.image, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthbuffer, 0);
+
+	glClearColor(.0f, 0.0f, 0.2f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	glEnable(GL_DEPTH_TEST);
+
+	double display_time_seconds = ((double)predictedDisplayTime) / (1000. * 1000. * 1000.);
+	const float rotations_per_sec = .25;
+	float rotation = ((long)(display_time_seconds * 360. * rotations_per_sec)) % 360;
+
+	float dist = 1.5f;
+	float height = 0.5f;
+	render_cube(vec3(0, height, -dist), .33f, rotation, viewmatrix.m, projectionmatrix.m);
+	render_cube(vec3(0, height, dist), .33f, rotation, viewmatrix.m, projectionmatrix.m);
+	render_cube(vec3(dist, height, 0), .33f, rotation, viewmatrix.m, projectionmatrix.m);
+	render_cube(vec3(-dist, height, 0), .33f, rotation, viewmatrix.m, projectionmatrix.m);
+
+	glUseProgram(shaderProgramID);
+	glBindVertexArray(VAOs[0]);
+
+	int color = glGetUniformLocation(shaderProgramID, "uniformColor");
+	// the color (0, 0, 0) will get replaced by some UV color in the shader
+	glUniform3f(color, 0.0, 0.0, 0.0);
+
+	int viewLoc = glGetUniformLocation(shaderProgramID, "view");
 	glUniformMatrix4fv(viewLoc, 1, GL_FALSE, (float*)viewmatrix.m);
 	int projLoc = glGetUniformLocation(shaderProgramID, "proj");
 	glUniformMatrix4fv(projLoc, 1, GL_FALSE, (float*)projectionmatrix.m);
 
 	int modelLoc = glGetUniformLocation(shaderProgramID, "model");
-	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (float*)modelmatrix_front.m);
-	glDrawArrays(GL_TRIANGLES, 0, 36);
-
-	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (float*)modelmatrix_back.m);
-	glDrawArrays(GL_TRIANGLES, 0, 36);
-
-	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (float*)modelmatrix_left.m);
-	glDrawArrays(GL_TRIANGLES, 0, 36);
-
-	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (float*)modelmatrix_right.m);
-	glDrawArrays(GL_TRIANGLES, 0, 36);
-
 	for (int hand = 0; hand < 2; hand++) {
 		if (hand == 0) {
 			glUniform3f(color, 1.0, 0.5, 0.5);
@@ -286,18 +307,16 @@ renderFrame(int w,
 			glUniform3f(color, 0.5, 1.0, 0.5);
 		}
 
-		// draw blocks for controller locations if hand tracking is not
-		// available
+		// draw blocks for controller locations if hand tracking is not available
 		if (!joint_locations[hand].isActive) {
 
 			if (!hand_locations_valid[hand])
 				continue;
 
 			XrMatrix4x4f matrix;
-			XrVector3f uniformScale = {.x = .05f, .y = .05f, .z = .2f};
-			XrMatrix4x4f_CreateTranslationRotationScaleRotate(
-			    &matrix, &hand_locations[hand].pose.position, &hand_locations[hand].pose.orientation,
-			    &uniformScale);
+			XrVector3f scale = {.x = .05f, .y = .05f, .z = .2f};
+			XrMatrix4x4f_CreateModelMatrix(&matrix, &hand_locations[hand].pose.position,
+			                               &hand_locations[hand].pose.orientation, &scale);
 			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (float*)matrix.m);
 
 			glDrawArrays(GL_TRIANGLES, 0, 36);
@@ -313,20 +332,18 @@ renderFrame(int w,
 
 			float size = joint_location->radius;
 
+			XrVector3f scale = {.x = size, .y = size, .z = size};
 			XrMatrix4x4f joint_matrix;
-			XrVector3f uniformScale = {.x = size, .y = size, .z = size};
-			XrMatrix4x4f_CreateTranslationRotationScaleRotate(
-			    &joint_matrix, &joint_location->pose.position, &joint_location->pose.orientation,
-			    &uniformScale);
+			XrMatrix4x4f_CreateModelMatrix(&joint_matrix, &joint_location->pose.position,
+			                               &joint_location->pose.orientation, &scale);
 			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (float*)joint_matrix.m);
 			glDrawArrays(GL_TRIANGLES, 0, 36);
 		}
 	}
 
-
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	if (viewIndex == 0) {
+	if (view_index == 0) {
 		_glBlitNamedFramebuffer((GLuint)framebuffer,             // readFramebuffer
 		                        (GLuint)0,                       // backbuffer     // drawFramebuffer
 		                        (GLint)0,                        // srcX0
@@ -340,12 +357,12 @@ renderFrame(int w,
 		                        (GLbitfield)GL_COLOR_BUFFER_BIT, // mask
 		                        (GLenum)GL_LINEAR);              // filter
 
-		SDL_GL_SwapWindow(mainwindow);
+		SDL_GL_SwapWindow(desktop_window);
 	}
 }
 
 void
-genFramebuffers(int count, GLuint* framebuffers)
+cleanup_gl()
 {
-	glGenFramebuffers(count, framebuffers);
+	// TODO clean up gl stuff
 }
