@@ -44,6 +44,13 @@ int
 init_gl();
 
 void
+render_quad(int w,
+            int h,
+            int64_t swapchain_format,
+            XrSwapchainImageOpenGLKHR image,
+            XrTime predictedDisplayTime);
+
+void
 render_frame(int w,
              int h,
              XrMatrix4x4f projectionmatrix,

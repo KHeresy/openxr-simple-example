@@ -75,6 +75,8 @@ typedef struct xr_example
 
 	// The runtime interacts with the OpenGL images (textures) via a Swapchain.
 	XrGraphicsBindingOpenGLXlibKHR graphics_binding_gl;
+
+	int64_t swapchain_format;
 	// length of the swapchain per view. Usually all the same, but not required.
 	uint32_t* swapchain_lengths;
 	// one array of images per view.
@@ -82,9 +84,17 @@ typedef struct xr_example
 	// one swapchain per view. Using only one and rendering l/r to the same image is also possible.
 	XrSwapchain* swapchains;
 
+	int64_t depth_swapchain_format;
 	uint32_t* depth_swapchain_lengths;
 	XrSwapchainImageOpenGLKHR** depth_images;
 	XrSwapchain* depth_swapchains;
+
+	// quad layers are placed into world space, no need to render them per eye
+	int64_t quad_swapchain_format;
+	uint32_t quad_pixel_width, quad_pixel_height;
+	uint32_t quad_swapchain_length;
+	XrSwapchainImageOpenGLKHR* quad_images;
+	XrSwapchain quad_swapchain;
 
 	// To render into a texture we need a framebuffer (one per texture to make it easy)
 	GLuint** framebuffers;
@@ -572,22 +582,28 @@ init_openxr(xr_example* self)
 	// SRGB is usually the best choice. Selection logic should be expanded though.
 	int64_t preferred_swapchain_format = GL_SRGB8_ALPHA8_EXT;
 	int64_t preferred_depth_swapchain_format = GL_DEPTH_COMPONENT32;
+	int64_t preferred_quad_swapchain_format = GL_RGBA8_EXT;
 
-	int64_t swapchain_format = swapchain_formats[0];
-	int64_t depth_swapchain_format = -1;
+
+	self->swapchain_format = swapchain_formats[0];
+	self->depth_swapchain_format = -1;
 	for (uint32_t i = 0; i < swapchain_format_count; i++) {
 		printf("Supported GL format: %#lx\n", swapchain_formats[i]);
 		if (swapchain_formats[i] == preferred_swapchain_format) {
-			swapchain_format = swapchain_formats[i];
-			printf("Using preferred swapchain format %#lx\n", swapchain_format);
+			self->swapchain_format = swapchain_formats[i];
+			printf("Using preferred swapchain format %#lx\n", self->swapchain_format);
 		}
 		if (swapchain_formats[i] == preferred_depth_swapchain_format) {
-			depth_swapchain_format = swapchain_formats[i];
-			printf("Using preferred depth swapchain format %#lx\n", depth_swapchain_format);
+			self->depth_swapchain_format = swapchain_formats[i];
+			printf("Using preferred depth swapchain format %#lx\n", self->depth_swapchain_format);
+		}
+		if (swapchain_formats[i] == preferred_quad_swapchain_format) {
+			self->quad_swapchain_format = swapchain_formats[i];
+			printf("Using preferred quad swapchain format %#lx\n", self->quad_swapchain_format);
 		}
 	}
-	if (swapchain_format != preferred_swapchain_format) {
-		printf("Using non preferred swapchain format %#lx\n", swapchain_format);
+	if (self->swapchain_format != preferred_swapchain_format) {
+		printf("Using non preferred swapchain format %#lx\n", self->swapchain_format);
 	}
 	/* All OpenGL textures that will be submitted in xrEndFrame are created by the runtime here.
 	 * The runtime will give us a number (not controlled by us) of OpenGL textures per swapchain
@@ -603,7 +619,7 @@ init_openxr(xr_example* self)
 		    .type = XR_TYPE_SWAPCHAIN_CREATE_INFO,
 		    .usageFlags = XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT,
 		    .createFlags = 0,
-		    .format = swapchain_format,
+		    .format = self->swapchain_format,
 		    .sampleCount = self->viewconfig_views[i].recommendedSwapchainSampleCount,
 		    .width = self->viewconfig_views[i].recommendedImageRectWidth,
 		    .height = self->viewconfig_views[i].recommendedImageRectHeight,
@@ -645,7 +661,7 @@ init_openxr(xr_example* self)
 		glGenFramebuffers(self->swapchain_lengths[i], self->framebuffers[i]);
 	}
 
-	if (depth_swapchain_format == -1) {
+	if (self->depth_swapchain_format == -1) {
 		// TODO: uh oh.
 		printf("Preferred depth swapchain format %#lx not supported!\n",
 		       preferred_depth_swapchain_format);
@@ -659,7 +675,7 @@ init_openxr(xr_example* self)
 		    .type = XR_TYPE_SWAPCHAIN_CREATE_INFO,
 		    .usageFlags = XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
 		    .createFlags = 0,
-		    .format = GL_DEPTH_COMPONENT32,
+		    .format = self->depth_swapchain_format,
 		    .sampleCount = self->viewconfig_views[i].recommendedSwapchainSampleCount,
 		    .width = self->viewconfig_views[i].recommendedImageRectWidth,
 		    .height = self->viewconfig_views[i].recommendedImageRectHeight,
@@ -688,6 +704,45 @@ init_openxr(xr_example* self)
 		result = xrEnumerateSwapchainImages(self->depth_swapchains[i], self->depth_swapchain_lengths[i],
 		                                    &self->depth_swapchain_lengths[i],
 		                                    (XrSwapchainImageBaseHeader*)self->depth_images[i]);
+		if (!xr_result(self->instance, result, "Failed to enumerate swapchain images"))
+			return 1;
+	}
+
+	self->quad_pixel_width = 800;
+	self->quad_pixel_height = 600;
+	{
+		XrSwapchainCreateInfo swapchain_create_info = {
+		    .type = XR_TYPE_SWAPCHAIN_CREATE_INFO,
+		    .usageFlags = XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT,
+		    .createFlags = 0,
+		    .format = self->quad_swapchain_format,
+		    .sampleCount = 1,
+		    .width = self->quad_pixel_width,
+		    .height = self->quad_pixel_height,
+		    .faceCount = 1,
+		    .arraySize = 1,
+		    .mipCount = 1,
+		    .next = NULL,
+		};
+
+		result = xrCreateSwapchain(self->session, &swapchain_create_info, &self->quad_swapchain);
+		if (!xr_result(self->instance, result, "Failed to create swapchain!"))
+			return 1;
+
+		result =
+		    xrEnumerateSwapchainImages(self->quad_swapchain, 0, &self->quad_swapchain_length, NULL);
+		if (!xr_result(self->instance, result, "Failed to enumerate swapchains"))
+			return 1;
+
+		// these are wrappers for the actual OpenGL texture id
+		self->quad_images = malloc(sizeof(XrSwapchainImageOpenGLKHR) * self->quad_swapchain_length);
+		for (uint32_t j = 0; j < self->quad_swapchain_length; j++) {
+			self->quad_images[j].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
+			self->quad_images[j].next = NULL;
+		}
+		result = xrEnumerateSwapchainImages(self->quad_swapchain, self->quad_swapchain_length,
+		                                    &self->quad_swapchain_length,
+		                                    (XrSwapchainImageBaseHeader*)self->quad_images);
 		if (!xr_result(self->instance, result, "Failed to enumerate swapchain images"))
 			return 1;
 	}
@@ -1260,6 +1315,29 @@ main_loop(xr_example* self)
 				break;
 		}
 
+		XrSwapchainImageAcquireInfo acquire_info = {.type = XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO,
+		                                            .next = NULL};
+		uint32_t acquired_index;
+		result = xrAcquireSwapchainImage(self->quad_swapchain, &acquire_info, &acquired_index);
+		if (!xr_result(self->instance, result, "failed to acquire swapchain image!"))
+			break;
+
+		XrSwapchainImageWaitInfo wait_info = {
+		    .type = XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO, .next = NULL, .timeout = 1000};
+		result = xrWaitSwapchainImage(self->quad_swapchain, &wait_info);
+		if (!xr_result(self->instance, result, "failed to wait for swapchain image!"))
+			break;
+
+		render_quad(self->quad_pixel_width, self->quad_pixel_height, self->swapchain_format,
+		            self->quad_images[acquired_index], frameState.predictedDisplayTime);
+
+		XrSwapchainImageReleaseInfo release_info = {.type = XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO,
+		                                            .next = NULL};
+		result = xrReleaseSwapchainImage(self->quad_swapchain, &release_info);
+		if (!xr_result(self->instance, result, "failed to release swapchain image!"))
+			break;
+
+
 		// projectionLayers struct reused for every frame
 		XrCompositionLayerProjection projection_layer = {
 		    .type = XR_TYPE_COMPOSITION_LAYER_PROJECTION,
@@ -1279,10 +1357,15 @@ main_loop(xr_example* self)
 		    .space = self->play_space,
 		    .eyeVisibility = XR_EYE_VISIBILITY_BOTH,
 		    .pose = {.orientation = {.x = 0.f, .y = 0.f, .z = 0.f, .w = 1.f},
-		             .position = {.x = 1.f, .y = 1.f, .z = -3.f}},
-		    .size = {.width = self->projection_views[0].subImage.imageRect.extent.width * 0.001f,
+		             .position = {.x = 1.f, .y = 1.f, .z = -15.f}},
+		    .size = {.width = (float)self->quad_pixel_width * 0.005f,
 		             .height = quad_layer.size.width / aspect},
-		    .subImage = self->projection_views[0].subImage};
+		    .subImage = {
+		        .swapchain = self->quad_swapchain,
+		        .imageRect = {
+		            .offset = {.x = 0, .y = 0},
+		            .extent = {.width = self->quad_pixel_width, .height = self->quad_pixel_height},
+		        }}};
 
 		const XrCompositionLayerBaseHeader* const submittedLayers[] = {
 		    (const XrCompositionLayerBaseHeader* const) & projection_layer,

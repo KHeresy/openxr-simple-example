@@ -100,10 +100,8 @@ init_sdl_window(Display** xDisplay,
 
 	gl_context = SDL_GL_CreateContext(desktop_window);
 
-	/*
 	glEnable(GL_DEBUG_OUTPUT);
 	glDebugMessageCallback(MessageCallback, 0);
-	*/
 
 	SDL_GL_SetSwapInterval(0);
 
@@ -246,6 +244,35 @@ render_cube(
 	int modelLoc = glGetUniformLocation(shaderProgramID, "model");
 	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (float*)modelmatrix.m);
 	glDrawArrays(GL_TRIANGLES, 0, 36);
+}
+
+void
+render_quad(int w,
+            int h,
+            int64_t swapchain_format,
+            XrSwapchainImageOpenGLKHR image,
+            XrTime predictedDisplayTime)
+{
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, image.image);
+
+	glViewport(0, 0, w, h);
+	glScissor(0, 0, w, h);
+
+	uint8_t* rgb = malloc(sizeof(uint8_t) * w * h * 4);
+	for (int row = 0; row < h; row++) {
+		for (int col = 0; col < w; col++) {
+			uint8_t* base = &rgb[(row * w * 4 + col * 4)];
+			*(base + 0) = (((float)row / (float)h)) * 255.;
+			*(base + 1) = 0;
+			*(base + 2) = 0;
+			*(base + 3) = 255;
+		}
+	}
+
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, (GLsizei)w, (GLsizei)h, GL_RGBA, GL_UNSIGNED_BYTE,
+	                (GLvoid*)rgb);
+	free(rgb);
 }
 
 void
