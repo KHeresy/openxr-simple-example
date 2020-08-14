@@ -267,6 +267,20 @@ render_quad(int w,
 			*(base + 1) = 0;
 			*(base + 2) = 0;
 			*(base + 3) = 255;
+
+			if (abs(row - col) < 3) {
+				*(base + 0) = 255.;
+				*(base + 1) = 255;
+				*(base + 2) = 255;
+				*(base + 3) = 255;
+			}
+
+			if (abs((w - col) - (row)) < 3) {
+				*(base + 0) = 0.;
+				*(base + 1) = 0;
+				*(base + 2) = 0;
+				*(base + 3) = 255;
+			}
 		}
 	}
 

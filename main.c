@@ -96,17 +96,31 @@ typedef struct xr_example
 	XrSwapchainImageOpenGLKHR* quad_images;
 	XrSwapchain quad_swapchain;
 
+	// cylinder layer extension data
+	struct
+	{
+		bool supported;
+		int64_t format;
+		uint32_t swapchain_width, swapchain_height;
+		uint32_t swapchain_length;
+		XrSwapchainImageOpenGLKHR* images;
+		XrSwapchain swapchain;
+	} cylinder;
+
 	// To render into a texture we need a framebuffer (one per texture to make it easy)
 	GLuint** framebuffers;
 
 	XrPath hand_paths[HAND_COUNT];
 
-	// whether the runtime supports the hand tracking extension at all
-	bool hand_tracking_ext;
-	// whether the current VR system in use has hand tracking
-	bool hand_tracking_supported;
-	PFN_xrLocateHandJointsEXT pfnLocateHandJointsEXT;
-	XrHandTrackerEXT hand_trackers[HAND_COUNT];
+	// hand tracking extension data
+	struct
+	{
+		bool supported;
+		// whether the current VR system in use has hand tracking
+		bool system_supported;
+		PFN_xrLocateHandJointsEXT pfnLocateHandJointsEXT;
+		XrHandTrackerEXT trackers[HAND_COUNT];
+	} hand_tracking;
 } xr_example;
 
 bool
@@ -314,7 +328,12 @@ init_openxr(xr_example* self)
 			opengl_ext = true;
 		}
 		if (strcmp(XR_EXT_HAND_TRACKING_EXTENSION_NAME, extensionProperties[i].extensionName) == 0) {
-			self->hand_tracking_ext = true;
+			self->hand_tracking.supported = true;
+		}
+
+		if (strcmp(XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME,
+		           extensionProperties[i].extensionName) == 0) {
+			self->cylinder.supported = true;
 		}
 	}
 
@@ -325,15 +344,19 @@ init_openxr(xr_example* self)
 	}
 
 	printf("Runtime supports extensions:\n");
-	printf("%s: %d\n", XR_KHR_OPENGL_ENABLE_EXTENSION_NAME, opengl_ext);
-	printf("%s: %d\n", XR_EXT_HAND_TRACKING_EXTENSION_NAME, self->hand_tracking_ext);
+	printf("\t%s: %d\n", XR_KHR_OPENGL_ENABLE_EXTENSION_NAME, opengl_ext);
+	printf("\t%s: %d\n", XR_EXT_HAND_TRACKING_EXTENSION_NAME, self->hand_tracking.supported);
+	printf("\t%s: %d\n", XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME, self->cylinder.supported);
 
 	// --- Create XrInstance
 	int enabled_ext_count = 1;
-	const char* enabled_exts[2] = {XR_KHR_OPENGL_ENABLE_EXTENSION_NAME};
+	const char* enabled_exts[3] = {XR_KHR_OPENGL_ENABLE_EXTENSION_NAME};
 
-	if (self->hand_tracking_ext) {
+	if (self->hand_tracking.supported) {
 		enabled_exts[enabled_ext_count++] = XR_EXT_HAND_TRACKING_EXTENSION_NAME;
+	}
+	if (self->cylinder.supported) {
+		enabled_exts[enabled_ext_count++] = XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME;
 	}
 
 	// same can be done for API layers, but API layers can also be enabled by env var
@@ -391,7 +414,7 @@ init_openxr(xr_example* self)
 
 		XrSystemHandTrackingPropertiesEXT ht = {.type = XR_TYPE_SYSTEM_HAND_TRACKING_PROPERTIES_EXT,
 		                                        .next = NULL};
-		if (self->hand_tracking_ext) {
+		if (self->hand_tracking.supported) {
 			system_props.next = &ht;
 		}
 
@@ -399,9 +422,9 @@ init_openxr(xr_example* self)
 		if (!xr_result(self->instance, result, "Failed to get System properties"))
 			return 1;
 
-		self->hand_tracking_supported = self->hand_tracking_ext && ht.supportsHandTracking;
+		self->hand_tracking.system_supported = self->hand_tracking.supported && ht.supportsHandTracking;
 
-		print_system_properties(&system_props, self->hand_tracking_ext);
+		print_system_properties(&system_props, self->hand_tracking.supported);
 	}
 
 	print_supported_view_configs(self);
@@ -502,9 +525,10 @@ init_openxr(xr_example* self)
 
 	printf("Successfully created a session with OpenGL!\n");
 
-	if (self->hand_tracking_supported) {
-		result = xrGetInstanceProcAddr(self->instance, "xrLocateHandJointsEXT",
-		                               (PFN_xrVoidFunction*)&self->pfnLocateHandJointsEXT);
+	if (self->hand_tracking.system_supported) {
+		result =
+		    xrGetInstanceProcAddr(self->instance, "xrLocateHandJointsEXT",
+		                          (PFN_xrVoidFunction*)&self->hand_tracking.pfnLocateHandJointsEXT);
 
 		xr_result(self->instance, result, "Failed to get xrLocateHandJointsEXT function!");
 
@@ -522,7 +546,7 @@ init_openxr(xr_example* self)
 			    .hand = XR_HAND_LEFT_EXT,
 			    .handJointSet = XR_HAND_JOINT_SET_DEFAULT_EXT};
 			result = pfnCreateHandTrackerEXT(self->session, &hand_tracker_create_info,
-			                                 &self->hand_trackers[0]);
+			                                 &self->hand_tracking.trackers[HAND_LEFT]);
 			if (!xr_result(self->instance, result, "Failed to create left hand tracker")) {
 				return 1;
 			}
@@ -535,7 +559,7 @@ init_openxr(xr_example* self)
 			    .hand = XR_HAND_RIGHT_EXT,
 			    .handJointSet = XR_HAND_JOINT_SET_DEFAULT_EXT};
 			result = pfnCreateHandTrackerEXT(self->session, &hand_tracker_create_info,
-			                                 &self->hand_trackers[1]);
+			                                 &self->hand_tracking.trackers[HAND_RIGHT]);
 			if (!xr_result(self->instance, result, "Failed to create right hand tracker")) {
 				return 1;
 			}
@@ -581,11 +605,14 @@ init_openxr(xr_example* self)
 
 	// SRGB is usually the best choice. Selection logic should be expanded though.
 	int64_t preferred_swapchain_format = GL_SRGB8_ALPHA8_EXT;
-	int64_t preferred_depth_swapchain_format = GL_DEPTH_COMPONENT32;
+	// Using a depth format that directly maps to vulkan is a good idea:
+	// GL_DEPTH_COMPONENT16, GL_DEPTH_COMPONENT32F
+	int64_t preferred_depth_swapchain_format = GL_DEPTH_COMPONENT32F;
 	int64_t preferred_quad_swapchain_format = GL_RGBA8_EXT;
 
-
 	self->swapchain_format = swapchain_formats[0];
+	self->quad_swapchain_format = swapchain_formats[0];
+	self->cylinder.format = swapchain_formats[0];
 	self->depth_swapchain_format = -1;
 	for (uint32_t i = 0; i < swapchain_format_count; i++) {
 		printf("Supported GL format: %#lx\n", swapchain_formats[i]);
@@ -599,6 +626,7 @@ init_openxr(xr_example* self)
 		}
 		if (swapchain_formats[i] == preferred_quad_swapchain_format) {
 			self->quad_swapchain_format = swapchain_formats[i];
+			self->cylinder.format = swapchain_formats[i];
 			printf("Using preferred quad swapchain format %#lx\n", self->quad_swapchain_format);
 		}
 	}
@@ -708,9 +736,9 @@ init_openxr(xr_example* self)
 			return 1;
 	}
 
-	self->quad_pixel_width = 800;
-	self->quad_pixel_height = 600;
 	{
+		self->quad_pixel_width = 800;
+		self->quad_pixel_height = 600;
 		XrSwapchainCreateInfo swapchain_create_info = {
 		    .type = XR_TYPE_SWAPCHAIN_CREATE_INFO,
 		    .usageFlags = XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT,
@@ -743,6 +771,46 @@ init_openxr(xr_example* self)
 		result = xrEnumerateSwapchainImages(self->quad_swapchain, self->quad_swapchain_length,
 		                                    &self->quad_swapchain_length,
 		                                    (XrSwapchainImageBaseHeader*)self->quad_images);
+		if (!xr_result(self->instance, result, "Failed to enumerate swapchain images"))
+			return 1;
+	}
+
+	if (self->cylinder.supported) {
+		self->cylinder.swapchain_width = 800;
+		self->cylinder.swapchain_height = 600;
+		XrSwapchainCreateInfo swapchain_create_info = {
+		    .type = XR_TYPE_SWAPCHAIN_CREATE_INFO,
+		    .usageFlags = XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT,
+		    .createFlags = 0,
+		    .format = self->cylinder.format,
+		    .sampleCount = 1,
+		    .width = self->cylinder.swapchain_width,
+		    .height = self->cylinder.swapchain_height,
+		    .faceCount = 1,
+		    .arraySize = 1,
+		    .mipCount = 1,
+		    .next = NULL,
+		};
+
+		result = xrCreateSwapchain(self->session, &swapchain_create_info, &self->cylinder.swapchain);
+		if (!xr_result(self->instance, result, "Failed to create swapchain!"))
+			return 1;
+
+		result = xrEnumerateSwapchainImages(self->cylinder.swapchain, 0,
+		                                    &self->cylinder.swapchain_length, NULL);
+		if (!xr_result(self->instance, result, "Failed to enumerate swapchains"))
+			return 1;
+
+		// these are wrappers for the actual OpenGL texture id
+		self->cylinder.images =
+		    malloc(sizeof(XrSwapchainImageOpenGLKHR) * self->cylinder.swapchain_length);
+		for (uint32_t j = 0; j < self->cylinder.swapchain_length; j++) {
+			self->cylinder.images[j].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
+			self->cylinder.images[j].next = NULL;
+		}
+		result = xrEnumerateSwapchainImages(self->cylinder.swapchain, self->cylinder.swapchain_length,
+		                                    &self->cylinder.swapchain_length,
+		                                    (XrSwapchainImageBaseHeader*)self->cylinder.images);
 		if (!xr_result(self->instance, result, "Failed to enumerate swapchain images"))
 			return 1;
 	}
@@ -949,7 +1017,9 @@ main_loop(xr_example* self)
 
 
 
+	int loop_count = 0;
 	while (true) {
+		loop_count++;
 
 		// --- Poll SDL for events so we can exit with esc
 		SDL_Event sdl_event;
@@ -1076,11 +1146,11 @@ main_loop(xr_example* self)
 			break;
 
 
-		XrHandJointLocationEXT joints[2][XR_HAND_JOINT_COUNT_EXT];
-		XrHandJointLocationsEXT joint_locations[2] = {{0}};
-		if (self->hand_tracking_supported) {
+		XrHandJointLocationEXT joints[HAND_COUNT][XR_HAND_JOINT_COUNT_EXT];
+		XrHandJointLocationsEXT joint_locations[HAND_COUNT] = {{0}};
+		if (self->hand_tracking.system_supported) {
 
-			for (int i = 0; i < 2; i++) {
+			for (int i = 0; i < HAND_COUNT; i++) {
 
 				joint_locations[i] = (XrHandJointLocationsEXT){
 				    .type = XR_TYPE_HAND_JOINT_LOCATIONS_EXT,
@@ -1088,7 +1158,7 @@ main_loop(xr_example* self)
 				    .jointLocations = joints[i],
 				};
 
-				if (self->hand_trackers[i] == NULL)
+				if (self->hand_tracking.trackers[i] == NULL)
 					continue;
 
 				XrHandJointsLocateInfoEXT locateInfo = {.type = XR_TYPE_HAND_JOINTS_LOCATE_INFO_EXT,
@@ -1096,8 +1166,8 @@ main_loop(xr_example* self)
 				                                        .baseSpace = self->play_space,
 				                                        .time = frameState.predictedDisplayTime};
 
-				result =
-				    self->pfnLocateHandJointsEXT(self->hand_trackers[i], &locateInfo, &joint_locations[i]);
+				result = self->hand_tracking.pfnLocateHandJointsEXT(self->hand_tracking.trackers[i],
+				                                                    &locateInfo, &joint_locations[i]);
 				if (!xr_result(self->instance, result, "failed to locate hand %d joints!", i))
 					break;
 
@@ -1315,6 +1385,7 @@ main_loop(xr_example* self)
 				break;
 		}
 
+
 		XrSwapchainImageAcquireInfo acquire_info = {.type = XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO,
 		                                            .next = NULL};
 		uint32_t acquired_index;
@@ -1338,6 +1409,33 @@ main_loop(xr_example* self)
 			break;
 
 
+		if (self->cylinder.supported) {
+			XrSwapchainImageAcquireInfo acquire_info = {.type = XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO,
+			                                            .next = NULL};
+			uint32_t acquired_index;
+			result = xrAcquireSwapchainImage(self->cylinder.swapchain, &acquire_info, &acquired_index);
+			if (!xr_result(self->instance, result, "failed to acquire swapchain image!"))
+				break;
+
+			XrSwapchainImageWaitInfo wait_info = {
+			    .type = XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO, .next = NULL, .timeout = 1000};
+			result = xrWaitSwapchainImage(self->cylinder.swapchain, &wait_info);
+			if (!xr_result(self->instance, result, "failed to wait for swapchain image!"))
+				break;
+
+			render_quad(self->cylinder.swapchain_width, self->cylinder.swapchain_height,
+			            self->cylinder.format, self->cylinder.images[acquired_index],
+			            frameState.predictedDisplayTime);
+
+			XrSwapchainImageReleaseInfo release_info = {.type = XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO,
+			                                            .next = NULL};
+			result = xrReleaseSwapchainImage(self->cylinder.swapchain, &release_info);
+			if (!xr_result(self->instance, result, "failed to release swapchain image!"))
+				break;
+		}
+
+
+
 		// projectionLayers struct reused for every frame
 		XrCompositionLayerProjection projection_layer = {
 		    .type = XR_TYPE_COMPOSITION_LAYER_PROJECTION,
@@ -1348,8 +1446,8 @@ main_loop(xr_example* self)
 		    .views = self->projection_views,
 		};
 
-		float aspect = self->projection_views[0].subImage.imageRect.extent.width /
-		               self->projection_views[0].subImage.imageRect.extent.width;
+		float aspect = (float)self->quad_pixel_width / (float)self->quad_pixel_height;
+		float quad_width = 1.f;
 		XrCompositionLayerQuad quad_layer = {
 		    .type = XR_TYPE_COMPOSITION_LAYER_QUAD,
 		    .next = NULL,
@@ -1357,9 +1455,8 @@ main_loop(xr_example* self)
 		    .space = self->play_space,
 		    .eyeVisibility = XR_EYE_VISIBILITY_BOTH,
 		    .pose = {.orientation = {.x = 0.f, .y = 0.f, .z = 0.f, .w = 1.f},
-		             .position = {.x = 1.f, .y = 1.f, .z = -15.f}},
-		    .size = {.width = (float)self->quad_pixel_width * 0.005f,
-		             .height = quad_layer.size.width / aspect},
+		             .position = {.x = 0.f, .y = .7f, .z = -1.f}},
+		    .size = {.width = quad_width, .height = quad_width / aspect},
 		    .subImage = {
 		        .swapchain = self->quad_swapchain,
 		        .imageRect = {
@@ -1367,13 +1464,45 @@ main_loop(xr_example* self)
 		            .extent = {.width = self->quad_pixel_width, .height = self->quad_pixel_height},
 		        }}};
 
-		const XrCompositionLayerBaseHeader* const submittedLayers[] = {
-		    (const XrCompositionLayerBaseHeader* const) & projection_layer,
-		    (const XrCompositionLayerBaseHeader* const) & quad_layer};
+
+		float cylinder_aspect =
+		    (float)self->cylinder.swapchain_width / (float)self->cylinder.swapchain_height;
+
+		float threesixty = M_PI * 2 - 0.0001; /* TODO: spec issue range [0, 2π)*/
+
+		float angleratio = 1 + (loop_count % 1000) / 50.;
+		XrCompositionLayerCylinderKHR cylinder_layer = {
+		    .type = XR_TYPE_COMPOSITION_LAYER_CYLINDER_KHR,
+		    .next = NULL,
+		    .layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT,
+		    .space = self->play_space,
+		    .eyeVisibility = XR_EYE_VISIBILITY_BOTH,
+		    .subImage = {.swapchain = self->cylinder.swapchain,
+		                 .imageRect = {.offset = {.x = 0, .y = 0},
+		                               .extent = {.width = self->cylinder.swapchain_width,
+		                                          .height = self->cylinder.swapchain_height}}},
+		    .pose = {.orientation = {.x = 0.f, .y = 0.f, .z = 0.f, .w = 1.f},
+		             .position = {.x = 0.f, .y = 0.f, .z = -1.f}},
+		    .radius = 2.5,
+		    .centralAngle = threesixty / 3,
+		    .aspectRatio = cylinder_aspect};
+
+		int submitted_layer_count = 1;
+		const XrCompositionLayerBaseHeader* submittedLayers[3] = {
+		    (const XrCompositionLayerBaseHeader* const) & projection_layer};
+
+		if (true) {
+			submittedLayers[submitted_layer_count++] =
+			    (const XrCompositionLayerBaseHeader* const) & quad_layer;
+		}
+		if (self->cylinder.supported) {
+			submittedLayers[submitted_layer_count++] =
+			    (const XrCompositionLayerBaseHeader* const) & cylinder_layer;
+		};
+
 		XrFrameEndInfo frameEndInfo = {.type = XR_TYPE_FRAME_END_INFO,
 		                               .displayTime = frameState.predictedDisplayTime,
-		                               .layerCount =
-		                                   sizeof(submittedLayers) / sizeof(submittedLayers[0]),
+		                               .layerCount = submitted_layer_count,
 		                               .layers = submittedLayers,
 		                               .environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE,
 		                               .next = NULL};
@@ -1399,21 +1528,21 @@ cleanup(xr_example* self)
 
 	xrEndSession(self->session);
 
-	if (self->hand_tracking_supported) {
+	if (self->hand_tracking.system_supported) {
 		PFN_xrDestroyHandTrackerEXT pfnDestroyHandTrackerEXT = NULL;
 		result = xrGetInstanceProcAddr(self->instance, "xrDestroyHandTrackerEXT",
 		                               (PFN_xrVoidFunction*)&pfnDestroyHandTrackerEXT);
 
 		xr_result(self->instance, result, "Failed to get xrDestroyHandTrackerEXT function!");
 
-		if (self->hand_trackers[0]) {
-			result = pfnDestroyHandTrackerEXT(self->hand_trackers[0]);
+		if (self->hand_tracking.trackers[HAND_LEFT]) {
+			result = pfnDestroyHandTrackerEXT(self->hand_tracking.trackers[HAND_LEFT]);
 			if (xr_result(self->instance, result, "Failed to destroy left hand tracker")) {
 				printf("Destroyed hand tracker for left hand\n");
 			}
 		}
-		if (self->hand_trackers[1]) {
-			result = pfnDestroyHandTrackerEXT(self->hand_trackers[1]);
+		if (self->hand_tracking.trackers[HAND_RIGHT]) {
+			result = pfnDestroyHandTrackerEXT(self->hand_tracking.trackers[HAND_RIGHT]);
 			if (xr_result(self->instance, result, "Failed to destroy left hand tracker")) {
 				printf("Destroyed hand tracker for left hand\n");
 			}
