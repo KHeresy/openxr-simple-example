@@ -1596,7 +1596,6 @@ cleanup(xr_example* self)
 	}
 
 	xrDestroySession(self->session);
-	xrDestroyInstance(self->instance);
 
 	for (uint32_t i = 0; i < self->view_count; i++) {
 		free(self->images[i]);
@@ -1605,6 +1604,7 @@ cleanup(xr_example* self)
 		glDeleteFramebuffers(self->swapchain_lengths[i], self->framebuffers[i]);
 		free(self->framebuffers[i]);
 	}
+	xrDestroyInstance(self->instance);
 
 	free(self->viewconfig_views);
 	free(self->projection_views);
@@ -1616,6 +1616,8 @@ cleanup(xr_example* self)
 	free(self->framebuffers);
 	free(self->swapchain_lengths);
 	free(self->depth_swapchain_lengths);
+
+	free(self->depth.infos);
 
 	cleanup_gl();
 }
