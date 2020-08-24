@@ -1501,7 +1501,7 @@ main_loop(xr_example* self)
 		    .space = self->play_space,
 		    .eyeVisibility = XR_EYE_VISIBILITY_BOTH,
 		    .pose = {.orientation = {.x = 0.f, .y = 0.f, .z = 0.f, .w = 1.f},
-		             .position = {.x = 0.f, .y = .7f, .z = -1.f}},
+		             .position = {.x = 1.5f, .y = .7f, .z = -1.5f}},
 		    .size = {.width = quad_width, .height = quad_width / aspect},
 		    .subImage = {
 		        .swapchain = self->quad_swapchain,
@@ -1528,8 +1528,8 @@ main_loop(xr_example* self)
 		                               .extent = {.width = self->cylinder.swapchain_width,
 		                                          .height = self->cylinder.swapchain_height}}},
 		    .pose = {.orientation = {.x = 0.f, .y = 0.f, .z = 0.f, .w = 1.f},
-		             .position = {.x = 0.f, .y = 0.f, .z = -1.f}},
-		    .radius = 2.5,
+		             .position = {.x = 1.5f, .y = 0.f, .z = -1.5f}},
+		    .radius = 0.5,
 		    .centralAngle = threesixty / 3,
 		    .aspectRatio = cylinder_aspect};
 
