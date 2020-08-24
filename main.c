@@ -96,6 +96,16 @@ typedef struct xr_example
 	XrSwapchainImageOpenGLKHR* quad_images;
 	XrSwapchain quad_swapchain;
 
+	float near_z;
+	float far_z;
+
+	// depth layer data
+	struct
+	{
+		bool supported;
+		XrCompositionLayerDepthInfoKHR* infos;
+	} depth;
+
 	// cylinder layer extension data
 	struct
 	{
@@ -335,6 +345,11 @@ init_openxr(xr_example* self)
 		           extensionProperties[i].extensionName) == 0) {
 			self->cylinder.supported = true;
 		}
+
+		if (strcmp(XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME,
+		           extensionProperties[i].extensionName) == 0) {
+			self->depth.supported = true;
+		}
 	}
 
 	// A graphics extension like OpenGL is required to draw anything in VR
@@ -347,6 +362,7 @@ init_openxr(xr_example* self)
 	printf("\t%s: %d\n", XR_KHR_OPENGL_ENABLE_EXTENSION_NAME, opengl_ext);
 	printf("\t%s: %d\n", XR_EXT_HAND_TRACKING_EXTENSION_NAME, self->hand_tracking.supported);
 	printf("\t%s: %d\n", XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME, self->cylinder.supported);
+	printf("\t%s: %d\n", XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME, self->depth.supported);
 
 	// --- Create XrInstance
 	int enabled_ext_count = 1;
@@ -450,21 +466,6 @@ init_openxr(xr_example* self)
 	if (!xr_result(self->instance, result, "Failed to enumerate view configuration views!"))
 		return 1;
 	print_viewconfig_view_info(self);
-
-
-	// A stereo view config implies two views, but our code is set up for a dynamic amount of views.
-	// So we need to allocate a bunch of memory for data structures dynamically.
-	self->views = (XrView*)malloc(sizeof(XrView) * self->view_count);
-	self->projection_views = (XrCompositionLayerProjectionView*)malloc(
-	    sizeof(XrCompositionLayerProjectionView) * self->view_count);
-	for (uint32_t i = 0; i < self->view_count; i++) {
-		self->views[i].type = XR_TYPE_VIEW;
-		self->views[i].next = NULL;
-
-		self->projection_views[i].type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW;
-		self->projection_views[i].next = NULL;
-	};
-
 
 
 	// OpenXR requires checking graphics requirements before creating a session.
@@ -813,6 +814,60 @@ init_openxr(xr_example* self)
 		                                    (XrSwapchainImageBaseHeader*)self->cylinder.images);
 		if (!xr_result(self->instance, result, "Failed to enumerate swapchain images"))
 			return 1;
+	}
+
+
+	self->near_z = 0.01f;
+	self->far_z = 100.f;
+
+	// A stereo view config implies two views, but our code is set up for a dynamic amount of views.
+	// So we need to allocate a bunch of memory for data structures dynamically.
+	self->views = (XrView*)malloc(sizeof(XrView) * self->view_count);
+	self->projection_views = (XrCompositionLayerProjectionView*)malloc(
+	    sizeof(XrCompositionLayerProjectionView) * self->view_count);
+	for (uint32_t i = 0; i < self->view_count; i++) {
+		self->views[i].type = XR_TYPE_VIEW;
+		self->views[i].next = NULL;
+
+		self->projection_views[i].type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW;
+		self->projection_views[i].next = NULL;
+
+		self->projection_views[i].subImage.swapchain = self->swapchains[i];
+		self->projection_views[i].subImage.imageArrayIndex = 0;
+		self->projection_views[i].subImage.imageRect.offset.x = 0;
+		self->projection_views[i].subImage.imageRect.offset.y = 0;
+		self->projection_views[i].subImage.imageRect.extent.width =
+		    self->viewconfig_views[i].recommendedImageRectWidth;
+		self->projection_views[i].subImage.imageRect.extent.height =
+		    self->viewconfig_views[i].recommendedImageRectHeight;
+
+		// projection_views[i].pose (and fov) have to be filled every frame in frame loop
+	};
+
+	// analog to projection layer allocation, though we can actually fill everything in here
+	if (self->depth.supported) {
+		self->depth.infos = (XrCompositionLayerDepthInfoKHR*)malloc(
+		    sizeof(XrCompositionLayerDepthInfoKHR) * self->view_count);
+		for (uint32_t i = 0; i < self->view_count; i++) {
+			self->depth.infos[i].type = XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR;
+			self->depth.infos[i].next = NULL;
+			self->depth.infos[i].minDepth = 0.f;
+			self->depth.infos[i].maxDepth = 1.f;
+			self->depth.infos[i].nearZ = self->near_z;
+			self->depth.infos[i].farZ = self->far_z;
+
+			self->depth.infos[i].subImage.swapchain = self->depth_swapchains[i];
+
+			self->depth.infos[i].subImage.imageArrayIndex = 0;
+			self->depth.infos[i].subImage.imageRect.offset.x = 0;
+			self->depth.infos[i].subImage.imageRect.offset.y = 0;
+			self->depth.infos[i].subImage.imageRect.extent.width =
+			    self->viewconfig_views[i].recommendedImageRectWidth;
+			self->depth.infos[i].subImage.imageRect.extent.height =
+			    self->viewconfig_views[i].recommendedImageRectHeight;
+
+			self->projection_views[i].next = &self->depth.infos[i];
+		};
 	}
 
 	return 0;
@@ -1318,8 +1373,8 @@ main_loop(xr_example* self)
 		// render each eye and fill projection_views with the result
 		for (uint32_t i = 0; i < self->view_count; i++) {
 			XrMatrix4x4f projection_matrix;
-			XrMatrix4x4f_CreateProjectionFov(&projection_matrix, GRAPHICS_OPENGL, views[i].fov, 0.05f,
-			                                 100.0f);
+			XrMatrix4x4f_CreateProjectionFov(&projection_matrix, GRAPHICS_OPENGL, views[i].fov,
+			                                 self->near_z, self->far_z);
 
 			XrMatrix4x4f view_matrix;
 			XrMatrix4x4f_CreateViewMatrix(&view_matrix, &views[i].pose.position,
@@ -1353,17 +1408,8 @@ main_loop(xr_example* self)
 			if (!xr_result(self->instance, result, "failed to wait for swapchain image!"))
 				break;
 
-
 			self->projection_views[i].pose = views[i].pose;
 			self->projection_views[i].fov = views[i].fov;
-			self->projection_views[i].subImage.swapchain = self->swapchains[i];
-			self->projection_views[i].subImage.imageArrayIndex = 0;
-			self->projection_views[i].subImage.imageRect.offset.x = 0;
-			self->projection_views[i].subImage.imageRect.offset.y = 0;
-			self->projection_views[i].subImage.imageRect.extent.width =
-			    self->viewconfig_views[i].recommendedImageRectWidth;
-			self->projection_views[i].subImage.imageRect.extent.height =
-			    self->viewconfig_views[i].recommendedImageRectHeight;
 
 			render_frame(self->viewconfig_views[i].recommendedImageRectWidth,
 			             self->viewconfig_views[i].recommendedImageRectHeight, projection_matrix,
