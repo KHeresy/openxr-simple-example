@@ -229,8 +229,7 @@ render_cube(
 
 	glUseProgram(shaderProgramID);
 	glBindVertexArray(VAOs[0]);
-	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	glEnable(GL_DEPTH_TEST);
+
 
 	int color = glGetUniformLocation(shaderProgramID, "uniformColor");
 	// the color (0, 0, 0) will get replaced by some UV color in the shader
@@ -309,13 +308,14 @@ render_frame(int w,
 	glScissor(0, 0, w, h);
 
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, image.image, 0);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthbuffer, 0);
+	if (depthbuffer != UINT32_MAX) {
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthbuffer, 0);
+	} else {
+		// TODO: need a depth attachment for depth test when rendering to fbo
+	}
 
 	glClearColor(.0f, 0.0f, 0.2f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	glEnable(GL_DEPTH_TEST);
 
 	double display_time_seconds = ((double)predictedDisplayTime) / (1000. * 1000. * 1000.);
 	const float rotations_per_sec = .25;

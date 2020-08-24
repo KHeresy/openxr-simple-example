@@ -691,50 +691,51 @@ init_openxr(xr_example* self)
 	}
 
 	if (self->depth_swapchain_format == -1) {
-		// TODO: uh oh.
 		printf("Preferred depth swapchain format %#lx not supported!\n",
 		       preferred_depth_swapchain_format);
-		return 1;
 	}
-	self->depth_swapchains = malloc(sizeof(XrSwapchain) * self->view_count);
-	self->depth_swapchain_lengths = malloc(sizeof(uint32_t) * self->view_count);
-	self->depth_images = malloc(sizeof(XrSwapchainImageOpenGLKHR*) * self->view_count);
-	for (uint32_t i = 0; i < self->view_count; i++) {
-		XrSwapchainCreateInfo swapchain_create_info = {
-		    .type = XR_TYPE_SWAPCHAIN_CREATE_INFO,
-		    .usageFlags = XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-		    .createFlags = 0,
-		    .format = self->depth_swapchain_format,
-		    .sampleCount = self->viewconfig_views[i].recommendedSwapchainSampleCount,
-		    .width = self->viewconfig_views[i].recommendedImageRectWidth,
-		    .height = self->viewconfig_views[i].recommendedImageRectHeight,
-		    .faceCount = 1,
-		    .arraySize = 1,
-		    .mipCount = 1,
-		    .next = NULL,
-		};
 
-		result = xrCreateSwapchain(self->session, &swapchain_create_info, &self->depth_swapchains[i]);
-		if (!xr_result(self->instance, result, "Failed to create swapchain %d!", i))
-			return 1;
+	if (self->depth_swapchain_format != -1) {
+		self->depth_swapchains = malloc(sizeof(XrSwapchain) * self->view_count);
+		self->depth_swapchain_lengths = malloc(sizeof(uint32_t) * self->view_count);
+		self->depth_images = malloc(sizeof(XrSwapchainImageOpenGLKHR*) * self->view_count);
+		for (uint32_t i = 0; i < self->view_count; i++) {
+			XrSwapchainCreateInfo swapchain_create_info = {
+			    .type = XR_TYPE_SWAPCHAIN_CREATE_INFO,
+			    .usageFlags = XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+			    .createFlags = 0,
+			    .format = self->depth_swapchain_format,
+			    .sampleCount = self->viewconfig_views[i].recommendedSwapchainSampleCount,
+			    .width = self->viewconfig_views[i].recommendedImageRectWidth,
+			    .height = self->viewconfig_views[i].recommendedImageRectHeight,
+			    .faceCount = 1,
+			    .arraySize = 1,
+			    .mipCount = 1,
+			    .next = NULL,
+			};
 
-		result = xrEnumerateSwapchainImages(self->depth_swapchains[i], 0,
-		                                    &self->depth_swapchain_lengths[i], NULL);
-		if (!xr_result(self->instance, result, "Failed to enumerate swapchains"))
-			return 1;
+			result = xrCreateSwapchain(self->session, &swapchain_create_info, &self->depth_swapchains[i]);
+			if (!xr_result(self->instance, result, "Failed to create swapchain %d!", i))
+				return 1;
 
-		// these are wrappers for the actual OpenGL texture id
-		self->depth_images[i] =
-		    malloc(sizeof(XrSwapchainImageOpenGLKHR) * self->depth_swapchain_lengths[i]);
-		for (uint32_t j = 0; j < self->depth_swapchain_lengths[i]; j++) {
-			self->depth_images[i][j].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
-			self->depth_images[i][j].next = NULL;
+			result = xrEnumerateSwapchainImages(self->depth_swapchains[i], 0,
+			                                    &self->depth_swapchain_lengths[i], NULL);
+			if (!xr_result(self->instance, result, "Failed to enumerate swapchains"))
+				return 1;
+
+			// these are wrappers for the actual OpenGL texture id
+			self->depth_images[i] =
+			    malloc(sizeof(XrSwapchainImageOpenGLKHR) * self->depth_swapchain_lengths[i]);
+			for (uint32_t j = 0; j < self->depth_swapchain_lengths[i]; j++) {
+				self->depth_images[i][j].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
+				self->depth_images[i][j].next = NULL;
+			}
+			result = xrEnumerateSwapchainImages(
+			    self->depth_swapchains[i], self->depth_swapchain_lengths[i],
+			    &self->depth_swapchain_lengths[i], (XrSwapchainImageBaseHeader*)self->depth_images[i]);
+			if (!xr_result(self->instance, result, "Failed to enumerate swapchain images"))
+				return 1;
 		}
-		result = xrEnumerateSwapchainImages(self->depth_swapchains[i], self->depth_swapchain_lengths[i],
-		                                    &self->depth_swapchain_lengths[i],
-		                                    (XrSwapchainImageBaseHeader*)self->depth_images[i]);
-		if (!xr_result(self->instance, result, "Failed to enumerate swapchain images"))
-			return 1;
 	}
 
 	{
@@ -1393,29 +1394,33 @@ main_loop(xr_example* self)
 			if (!xr_result(self->instance, result, "failed to wait for swapchain image!"))
 				break;
 
+			uint32_t depth_acquired_index = UINT32_MAX;
+			if (self->depth_swapchain_format != -1) {
+				XrSwapchainImageAcquireInfo depth_acquire_info = {
+				    .type = XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO, .next = NULL};
+				result = xrAcquireSwapchainImage(self->depth_swapchains[i], &depth_acquire_info,
+				                                 &depth_acquired_index);
+				if (!xr_result(self->instance, result, "failed to acquire swapchain image!"))
+					break;
 
-			XrSwapchainImageAcquireInfo depth_acquire_info = {
-			    .type = XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO, .next = NULL};
-			uint32_t depth_acquired_index;
-			result = xrAcquireSwapchainImage(self->depth_swapchains[i], &depth_acquire_info,
-			                                 &depth_acquired_index);
-			if (!xr_result(self->instance, result, "failed to acquire swapchain image!"))
-				break;
-
-			XrSwapchainImageWaitInfo depth_wait_info = {
-			    .type = XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO, .next = NULL, .timeout = 1000};
-			result = xrWaitSwapchainImage(self->depth_swapchains[i], &depth_wait_info);
-			if (!xr_result(self->instance, result, "failed to wait for swapchain image!"))
-				break;
+				XrSwapchainImageWaitInfo depth_wait_info = {
+				    .type = XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO, .next = NULL, .timeout = 1000};
+				result = xrWaitSwapchainImage(self->depth_swapchains[i], &depth_wait_info);
+				if (!xr_result(self->instance, result, "failed to wait for swapchain image!"))
+					break;
+			}
 
 			self->projection_views[i].pose = views[i].pose;
 			self->projection_views[i].fov = views[i].fov;
 
+			GLuint depth_image = self->depth_swapchain_format != -1
+			                         ? self->depth_images[i][depth_acquired_index].image
+			                         : UINT32_MAX;
+
 			render_frame(self->viewconfig_views[i].recommendedImageRectWidth,
 			             self->viewconfig_views[i].recommendedImageRectHeight, projection_matrix,
 			             view_matrix, hand_locations, hand_locations_valid, joint_locations,
-			             self->framebuffers[i][acquired_index],
-			             self->depth_images[i][depth_acquired_index].image,
+			             self->framebuffers[i][acquired_index], depth_image,
 			             self->images[i][acquired_index], i, frameState.predictedDisplayTime);
 			glFinish();
 			XrSwapchainImageReleaseInfo release_info = {.type = XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO,
@@ -1424,11 +1429,13 @@ main_loop(xr_example* self)
 			if (!xr_result(self->instance, result, "failed to release swapchain image!"))
 				break;
 
-			XrSwapchainImageReleaseInfo depth_release_info = {
-			    .type = XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO, .next = NULL};
-			result = xrReleaseSwapchainImage(self->depth_swapchains[i], &depth_release_info);
-			if (!xr_result(self->instance, result, "failed to release swapchain image!"))
-				break;
+			if (self->depth_swapchain_format != -1) {
+				XrSwapchainImageReleaseInfo depth_release_info = {
+				    .type = XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO, .next = NULL};
+				result = xrReleaseSwapchainImage(self->depth_swapchains[i], &depth_release_info);
+				if (!xr_result(self->instance, result, "failed to release swapchain image!"))
+					break;
+			}
 		}
 
 
@@ -1599,7 +1606,9 @@ cleanup(xr_example* self)
 
 	for (uint32_t i = 0; i < self->view_count; i++) {
 		free(self->images[i]);
-		free(self->depth_images[i]);
+		if (self->depth_swapchain_format != -1) {
+			free(self->depth_images[i]);
+		}
 
 		glDeleteFramebuffers(self->swapchain_lengths[i], self->framebuffers[i]);
 		free(self->framebuffers[i]);
