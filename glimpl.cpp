@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <stdbool.h>
+
 #include <SDL2/SDL.h>
 
 #define degreesToRadians(angleDegrees) ((angleDegrees)*M_PI / 180.0)
@@ -21,60 +22,52 @@ GLuint shaderProgramID = 0;
 GLuint VAOs[1] = {0};
 
 static const char* vertexshader =
-    "#version 330 core\n"
-    "#extension GL_ARB_explicit_uniform_location : require\n"
-    "layout(location = 0) in vec3 aPos;\n"
-    "layout(location = 2) uniform mat4 model;\n"
-    "layout(location = 3) uniform mat4 view;\n"
-    "layout(location = 4) uniform mat4 proj;\n"
-    "layout(location = 5) in vec2 aColor;\n"
-    "out vec2 vertexColor;\n"
-    "void main() {\n"
-    "	gl_Position = proj * view * model * vec4(aPos.x, aPos.y, aPos.z, "
-    "1.0);\n"
-    "	vertexColor = aColor;\n"
-    "}\n";
+	"#version 330 core\n"
+	"#extension GL_ARB_explicit_uniform_location : require\n"
+	"layout(location = 0) in vec3 aPos;\n"
+	"layout(location = 2) uniform mat4 model;\n"
+	"layout(location = 3) uniform mat4 view;\n"
+	"layout(location = 4) uniform mat4 proj;\n"
+	"layout(location = 5) in vec2 aColor;\n"
+	"out vec2 vertexColor;\n"
+	"void main() {\n"
+	"	gl_Position = proj * view * model * vec4(aPos.x, aPos.y, aPos.z, "
+	"1.0);\n"
+	"	vertexColor = aColor;\n"
+	"}\n";
 
 static const char* fragmentshader =
-    "#version 330 core\n"
-    "#extension GL_ARB_explicit_uniform_location : require\n"
-    "layout(location = 0) out vec4 FragColor;\n"
-    "layout(location = 1) uniform vec3 uniformColor;\n"
-    "in vec2 vertexColor;\n"
-    "void main() {\n"
-    "	FragColor = (uniformColor.x < 0.01 && uniformColor.y < 0.01 && "
-    "uniformColor.z < 0.01) ? vec4(vertexColor, 1.0, 1.0) : vec4(uniformColor, "
-    "1.0);\n"
-    "}\n";
+	"#version 330 core\n"
+	"#extension GL_ARB_explicit_uniform_location : require\n"
+	"layout(location = 0) out vec4 FragColor;\n"
+	"layout(location = 1) uniform vec3 uniformColor;\n"
+	"in vec2 vertexColor;\n"
+	"void main() {\n"
+	"	FragColor = (uniformColor.x < 0.01 && uniformColor.y < 0.01 && "
+	"uniformColor.z < 0.01) ? vec4(vertexColor, 1.0, 1.0) : vec4(uniformColor, "
+	"1.0);\n"
+	"}\n";
 
 static SDL_Window* desktop_window;
 static SDL_GLContext gl_context;
 
-// don't need a gl loader for just one function, just load it ourselves'
-PFNGLBLITNAMEDFRAMEBUFFERPROC _glBlitNamedFramebuffer;
-
 void GLAPIENTRY
 MessageCallback(GLenum source,
-                GLenum type,
-                GLuint id,
-                GLenum severity,
-                GLsizei length,
-                const GLchar* message,
-                const void* userParam)
+				GLenum type,
+				GLuint id,
+				GLenum severity,
+				GLsizei length,
+				const GLchar* message,
+				const void* userParam)
 {
 	fprintf(stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
-	        (type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""), type, severity, message);
+			(type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""), type, severity, message);
 }
 
-#ifdef __linux__
 bool
-init_sdl_window(Display** xDisplay,
-                uint32_t* visualid,
-                GLXFBConfig* glxFBConfig,
-                GLXDrawable* glxDrawable,
-                GLXContext* glxContext,
-                int w,
-                int h)
+init_sdl_window(HDC& xDisplay, HGLRC& glxContext,
+				int w,
+				int h)
 {
 
 	if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -82,42 +75,37 @@ init_sdl_window(Display** xDisplay,
 		return false;
 	}
 
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
 
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 0);
 
-
 	/* Create our window centered at half the VR resolution */
-	desktop_window =
-	    SDL_CreateWindow("OpenXR Example", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w / 2,
-	                     h / 2, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
+	desktop_window = SDL_CreateWindow("OpenXR Example", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
+		w / 2, h / 2, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
 	if (!desktop_window) {
 		printf("Unable to create window");
 		return false;
 	}
 
 	gl_context = SDL_GL_CreateContext(desktop_window);
+	auto err = glewInit();
 
 	glEnable(GL_DEBUG_OUTPUT);
 	glDebugMessageCallback(MessageCallback, 0);
 
 	SDL_GL_SetSwapInterval(0);
 
-	_glBlitNamedFramebuffer =
-	    (PFNGLBLITNAMEDFRAMEBUFFERPROC)glXGetProcAddressARB((GLubyte*)"glBlitNamedFramebuffer");
 
 	// HACK? OpenXR wants us to report these values, so "work around" SDL a
 	// bit and get the underlying glx stuff. Does this still work when e.g.
 	// SDL switches to xcb?
-	*xDisplay = XOpenDisplay(NULL);
-	*glxContext = glXGetCurrentContext();
-	*glxDrawable = glXGetCurrentDrawable();
+	xDisplay = wglGetCurrentDC();
+	glxContext = wglGetCurrentContext();
 
 	return true;
 }
-#endif
 
 int
 init_gl()
@@ -174,34 +162,33 @@ init_gl()
 	glDeleteShader(fragment_shader_id);
 
 	float vertices[] = {-0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 0.5f,  -0.5f, -0.5f, 1.0f, 0.0f,
-	                    0.5f,  0.5f,  -0.5f, 1.0f, 1.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
-	                    -0.5f, 0.5f,  -0.5f, 0.0f, 1.0f, -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
+						0.5f,  0.5f,  -0.5f, 1.0f, 1.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
+						-0.5f, 0.5f,  -0.5f, 0.0f, 1.0f, -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
 
-	                    -0.5f, -0.5f, 0.5f,  0.0f, 0.0f, 0.5f,  -0.5f, 0.5f,  1.0f, 0.0f,
-	                    0.5f,  0.5f,  0.5f,  1.0f, 1.0f, 0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-	                    -0.5f, 0.5f,  0.5f,  0.0f, 1.0f, -0.5f, -0.5f, 0.5f,  0.0f, 0.0f,
+						-0.5f, -0.5f, 0.5f,  0.0f, 0.0f, 0.5f,  -0.5f, 0.5f,  1.0f, 0.0f,
+						0.5f,  0.5f,  0.5f,  1.0f, 1.0f, 0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+						-0.5f, 0.5f,  0.5f,  0.0f, 1.0f, -0.5f, -0.5f, 0.5f,  0.0f, 0.0f,
 
-	                    -0.5f, 0.5f,  0.5f,  1.0f, 0.0f, -0.5f, 0.5f,  -0.5f, 1.0f, 1.0f,
-	                    -0.5f, -0.5f, -0.5f, 0.0f, 1.0f, -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
-	                    -0.5f, -0.5f, 0.5f,  0.0f, 0.0f, -0.5f, 0.5f,  0.5f,  1.0f, 0.0f,
+						-0.5f, 0.5f,  0.5f,  1.0f, 0.0f, -0.5f, 0.5f,  -0.5f, 1.0f, 1.0f,
+						-0.5f, -0.5f, -0.5f, 0.0f, 1.0f, -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+						-0.5f, -0.5f, 0.5f,  0.0f, 0.0f, -0.5f, 0.5f,  0.5f,  1.0f, 0.0f,
 
-	                    0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
-	                    0.5f,  -0.5f, -0.5f, 0.0f, 1.0f, 0.5f,  -0.5f, -0.5f, 0.0f, 1.0f,
-	                    0.5f,  -0.5f, 0.5f,  0.0f, 0.0f, 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+						0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
+						0.5f,  -0.5f, -0.5f, 0.0f, 1.0f, 0.5f,  -0.5f, -0.5f, 0.0f, 1.0f,
+						0.5f,  -0.5f, 0.5f,  0.0f, 0.0f, 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
 
-	                    -0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.5f,  -0.5f, -0.5f, 1.0f, 1.0f,
-	                    0.5f,  -0.5f, 0.5f,  1.0f, 0.0f, 0.5f,  -0.5f, 0.5f,  1.0f, 0.0f,
-	                    -0.5f, -0.5f, 0.5f,  0.0f, 0.0f, -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+						-0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.5f,  -0.5f, -0.5f, 1.0f, 1.0f,
+						0.5f,  -0.5f, 0.5f,  1.0f, 0.0f, 0.5f,  -0.5f, 0.5f,  1.0f, 0.0f,
+						-0.5f, -0.5f, 0.5f,  0.0f, 0.0f, -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
 
-	                    -0.5f, 0.5f,  -0.5f, 0.0f, 1.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
-	                    0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-	                    -0.5f, 0.5f,  0.5f,  0.0f, 0.0f, -0.5f, 0.5f,  -0.5f, 0.0f, 1.0f};
+						-0.5f, 0.5f,  -0.5f, 0.0f, 1.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
+						0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+						-0.5f, 0.5f,  0.5f,  0.0f, 0.0f, -0.5f, 0.5f,  -0.5f, 0.0f, 1.0f};
 
 	GLuint VBOs[1];
 	glGenBuffers(1, VBOs);
 
 	glGenVertexArrays(1, &VAOs[0]);
-
 	glBindVertexArray(VAOs[0]);
 	glBindBuffer(GL_ARRAY_BUFFER, VBOs[0]);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
@@ -219,7 +206,7 @@ init_gl()
 
 void
 render_cube(
-    vec3_t position, float scale, float rotation, float* view_matrix, float* projection_matrix)
+	vec3_t position, float scale, float rotation, float* view_matrix, float* projection_matrix)
 {
 
 	mat4_t modelmatrix = m4_mul(m4_translation(position), m4_scaling(vec3(scale, scale, scale)));
@@ -247,10 +234,10 @@ render_cube(
 
 void
 render_quad(int w,
-            int h,
-            int64_t swapchain_format,
-            XrSwapchainImageOpenGLKHR image,
-            XrTime predictedDisplayTime)
+			int h,
+			int64_t swapchain_format,
+			XrSwapchainImageOpenGLKHR image,
+			XrTime predictedDisplayTime)
 {
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, image.image);
@@ -258,7 +245,7 @@ render_quad(int w,
 	glViewport(0, 0, w, h);
 	glScissor(0, 0, w, h);
 
-	uint8_t* rgb = malloc(sizeof(uint8_t) * w * h * 4);
+	uint8_t* rgb = new uint8_t[w * h * 4];
 	for (int row = 0; row < h; row++) {
 		for (int col = 0; col < w; col++) {
 			uint8_t* base = &rgb[(row * w * 4 + col * 4)];
@@ -284,23 +271,23 @@ render_quad(int w,
 	}
 
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, (GLsizei)w, (GLsizei)h, GL_RGBA, GL_UNSIGNED_BYTE,
-	                (GLvoid*)rgb);
-	free(rgb);
+					(GLvoid*)rgb);
+	delete [] rgb;
 }
 
 void
 render_frame(int w,
-             int h,
-             XrMatrix4x4f projectionmatrix,
-             XrMatrix4x4f viewmatrix,
-             XrSpaceLocation* hand_locations,
-             bool* hand_locations_valid,
-             XrHandJointLocationsEXT* joint_locations,
-             GLuint framebuffer,
-             GLuint depthbuffer,
-             XrSwapchainImageOpenGLKHR image,
-             int view_index,
-             XrTime predictedDisplayTime)
+			 int h,
+			 XrMatrix4x4f projectionmatrix,
+			 XrMatrix4x4f viewmatrix,
+			 XrSpaceLocation* hand_locations,
+			 bool* hand_locations_valid,
+			 XrHandJointLocationsEXT* joint_locations,
+			 GLuint framebuffer,
+			 GLuint depthbuffer,
+			 XrSwapchainImageOpenGLKHR image,
+			 int view_index,
+			 XrTime predictedDisplayTime)
 {
 	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 
@@ -357,7 +344,7 @@ render_frame(int w,
 			XrMatrix4x4f matrix;
 			XrVector3f scale = {.x = .05f, .y = .05f, .z = .2f};
 			XrMatrix4x4f_CreateModelMatrix(&matrix, &hand_locations[hand].pose.position,
-			                               &hand_locations[hand].pose.orientation, &scale);
+										   &hand_locations[hand].pose.orientation, &scale);
 			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (float*)matrix.m);
 
 			glDrawArrays(GL_TRIANGLES, 0, 36);
@@ -376,7 +363,7 @@ render_frame(int w,
 			XrVector3f scale = {.x = size, .y = size, .z = size};
 			XrMatrix4x4f joint_matrix;
 			XrMatrix4x4f_CreateModelMatrix(&joint_matrix, &joint_location->pose.position,
-			                               &joint_location->pose.orientation, &scale);
+										   &joint_location->pose.orientation, &scale);
 			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (float*)joint_matrix.m);
 			glDrawArrays(GL_TRIANGLES, 0, 36);
 		}
@@ -385,18 +372,18 @@ render_frame(int w,
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	if (view_index == 0) {
-		_glBlitNamedFramebuffer((GLuint)framebuffer,             // readFramebuffer
-		                        (GLuint)0,                       // backbuffer     // drawFramebuffer
-		                        (GLint)0,                        // srcX0
-		                        (GLint)0,                        // srcY0
-		                        (GLint)w,                        // srcX1
-		                        (GLint)h,                        // srcY1
-		                        (GLint)0,                        // dstX0
-		                        (GLint)0,                        // dstY0
-		                        (GLint)w / 2,                    // dstX1
-		                        (GLint)h / 2,                    // dstY1
-		                        (GLbitfield)GL_COLOR_BUFFER_BIT, // mask
-		                        (GLenum)GL_LINEAR);              // filter
+		//glBlitNamedFramebuffer((GLuint)framebuffer,             // readFramebuffer
+		//						(GLuint)0,                       // backbuffer     // drawFramebuffer
+		//						(GLint)0,                        // srcX0
+		//						(GLint)0,                        // srcY0
+		//						(GLint)w,                        // srcX1
+		//						(GLint)h,                        // srcY1
+		//						(GLint)0,                        // dstX0
+		//						(GLint)0,                        // dstY0
+		//						(GLint)w / 2,                    // dstX1
+		//						(GLint)h / 2,                    // dstY1
+		//						(GLbitfield)GL_COLOR_BUFFER_BIT, // mask
+		//						(GLenum)GL_LINEAR);              // filter
 
 		SDL_GL_SwapWindow(desktop_window);
 	}

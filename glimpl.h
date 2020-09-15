@@ -9,36 +9,24 @@
 #ifndef GLIMPL
 #define GLIMPL
 
-#define GL_GLEXT_PROTOTYPES
-#define GL3_PROTOTYPES
-#include <GL/gl.h>
-#include <GL/glext.h>
+#include <Windows.h>
+
+#define NO_SDL_GLEXT
+#include <GL/glew.h>
+#include <SDL2/SDL_opengl.h>
+#include <GL/glu.h>
+
 #include "xrmath.h"
 
-#ifdef __linux__
-#include <X11/Xlib.h>
-#include <GL/glx.h>
-
-#define XR_USE_PLATFORM_XLIB
+#define XR_USE_PLATFORM_WIN32
 #define XR_USE_GRAPHICS_API_OPENGL
-#include "openxr_headers/openxr.h"
-#include "openxr_headers/openxr_platform.h"
+#include "openxr/openxr.h"
+#include "openxr/openxr_platform.h"
 
 bool
-init_sdl_window(Display** xDisplay,
-                uint32_t* visualid,
-                GLXFBConfig* glxFBConfig,
-                GLXDrawable* glxDrawable,
-                GLXContext* glxContext,
+init_sdl_window(HDC& xDisplay, HGLRC& glxContext,
                 int w,
                 int h);
-#else
-
-#include "openxr_headers/openxr.h"
-#include "openxr_headers/openxr_platform.h"
-
-#error This example only supports Linux/XLIB
-#endif
 
 int
 init_gl();

@@ -104,48 +104,48 @@ typedef struct
 static inline vec3_t
 vec3(float x, float y, float z)
 {
-	return (vec3_t){x, y, z};
+	return vec3_t{x, y, z};
 }
 
 static inline vec3_t
 v3_add(vec3_t a, vec3_t b)
 {
-	return (vec3_t){a.x + b.x, a.y + b.y, a.z + b.z};
+	return vec3_t{a.x + b.x, a.y + b.y, a.z + b.z};
 }
 static inline vec3_t
 v3_adds(vec3_t a, float s)
 {
-	return (vec3_t){a.x + s, a.y + s, a.z + s};
+	return vec3_t{a.x + s, a.y + s, a.z + s};
 }
 static inline vec3_t
 v3_sub(vec3_t a, vec3_t b)
 {
-	return (vec3_t){a.x - b.x, a.y - b.y, a.z - b.z};
+	return vec3_t{a.x - b.x, a.y - b.y, a.z - b.z};
 }
 static inline vec3_t
 v3_subs(vec3_t a, float s)
 {
-	return (vec3_t){a.x - s, a.y - s, a.z - s};
+	return vec3_t{a.x - s, a.y - s, a.z - s};
 }
 static inline vec3_t
 v3_mul(vec3_t a, vec3_t b)
 {
-	return (vec3_t){a.x * b.x, a.y * b.y, a.z * b.z};
+	return vec3_t{a.x * b.x, a.y * b.y, a.z * b.z};
 }
 static inline vec3_t
 v3_muls(vec3_t a, float s)
 {
-	return (vec3_t){a.x * s, a.y * s, a.z * s};
+	return vec3_t{a.x * s, a.y * s, a.z * s};
 }
 static inline vec3_t
 v3_div(vec3_t a, vec3_t b)
 {
-	return (vec3_t){a.x / b.x, a.y / b.y, a.z / b.z};
+	return vec3_t{a.x / b.x, a.y / b.y, a.z / b.z};
 }
 static inline vec3_t
 v3_divs(vec3_t a, float s)
 {
-	return (vec3_t){a.x / s, a.y / s, a.z / s};
+	return vec3_t{a.x / s, a.y / s, a.z / s};
 }
 static inline float
 v3_length(vec3_t v)
@@ -223,21 +223,21 @@ typedef union {
 
 static inline mat4_t
 mat4(float m00,
-     float m10,
-     float m20,
-     float m30,
-     float m01,
-     float m11,
-     float m21,
-     float m31,
-     float m02,
-     float m12,
-     float m22,
-     float m32,
-     float m03,
-     float m13,
-     float m23,
-     float m33);
+	 float m10,
+	 float m20,
+	 float m30,
+	 float m01,
+	 float m11,
+	 float m21,
+	 float m31,
+	 float m02,
+	 float m12,
+	 float m22,
+	 float m32,
+	 float m03,
+	 float m13,
+	 float m23,
+	 float m33);
 
 static inline mat4_t
 mat4_f(float* mat);
@@ -261,9 +261,9 @@ mat4_t
 m4_ortho(float left, float right, float bottom, float top, float back, float front);
 mat4_t
 m4_perspective(float vertical_field_of_view_in_deg,
-               float aspect_ratio,
-               float near_view_distance,
-               float far_view_distance);
+			   float aspect_ratio,
+			   float near_view_distance,
+			   float far_view_distance);
 mat4_t
 m4_look_at(vec3_t from, vec3_t to, vec3_t up);
 
@@ -298,9 +298,9 @@ v3_norm(vec3_t v)
 {
 	float len = v3_length(v);
 	if (len > 0)
-		return (vec3_t){v.x / len, v.y / len, v.z / len};
+		return vec3_t{v.x / len, v.y / len, v.z / len};
 	else
-		return (vec3_t){0, 0, 0};
+		return vec3_t{0, 0, 0};
 }
 
 static inline vec3_t
@@ -312,7 +312,7 @@ v3_proj(vec3_t v, vec3_t onto)
 static inline vec3_t
 v3_cross(vec3_t a, vec3_t b)
 {
-	return (vec3_t){a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x};
+	return vec3_t{a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x};
 }
 
 static inline float
@@ -328,59 +328,63 @@ v3_angle_between(vec3_t a, vec3_t b)
 
 static inline mat4_t
 mat4(float m00,
-     float m10,
-     float m20,
-     float m30,
-     float m01,
-     float m11,
-     float m21,
-     float m31,
-     float m02,
-     float m12,
-     float m22,
-     float m32,
-     float m03,
-     float m13,
-     float m23,
-     float m33)
+	 float m10,
+	 float m20,
+	 float m30,
+	 float m01,
+	 float m11,
+	 float m21,
+	 float m31,
+	 float m02,
+	 float m12,
+	 float m22,
+	 float m32,
+	 float m03,
+	 float m13,
+	 float m23,
+	 float m33)
 {
-	return (mat4_t){.m[0][0] = m00,
-	                .m[1][0] = m10,
-	                .m[2][0] = m20,
-	                .m[3][0] = m30,
-	                .m[0][1] = m01,
-	                .m[1][1] = m11,
-	                .m[2][1] = m21,
-	                .m[3][1] = m31,
-	                .m[0][2] = m02,
-	                .m[1][2] = m12,
-	                .m[2][2] = m22,
-	                .m[3][2] = m32,
-	                .m[0][3] = m03,
-	                .m[1][3] = m13,
-	                .m[2][3] = m23,
-	                .m[3][3] = m33};
+	mat4_t m;
+	m.m[0][0] = m00;
+	m.m[1][0] = m10;
+	m.m[2][0] = m20;
+	m.m[3][0] = m30;
+	m.m[0][1] = m01;
+	m.m[1][1] = m11;
+	m.m[2][1] = m21;
+	m.m[3][1] = m31;
+	m.m[0][2] = m02;
+	m.m[1][2] = m12;
+	m.m[2][2] = m22;
+	m.m[3][2] = m32;
+	m.m[0][3] = m03;
+	m.m[1][3] = m13;
+	m.m[2][3] = m23;
+	m.m[3][3] = m33;
+	return m;
 }
 
 static inline mat4_t
 mat4_f(float* mat)
 {
-	return (mat4_t){.m[0][0] = mat[0],
-	                .m[1][0] = mat[4],
-	                .m[2][0] = mat[8],
-	                .m[3][0] = mat[12],
-	                .m[0][1] = mat[1],
-	                .m[1][1] = mat[5],
-	                .m[2][1] = mat[9],
-	                .m[3][1] = mat[13],
-	                .m[0][2] = mat[2],
-	                .m[1][2] = mat[6],
-	                .m[2][2] = mat[10],
-	                .m[3][2] = mat[14],
-	                .m[0][3] = mat[3],
-	                .m[1][3] = mat[7],
-	                .m[2][3] = mat[11],
-	                .m[3][3] = mat[15]};
+	mat4_t m;
+	m.m[0][0] = mat[0];
+	m.m[1][0] = mat[4];
+	m.m[2][0] = mat[8];
+	m.m[3][0] = mat[12];
+	m.m[0][1] = mat[1];
+	m.m[1][1] = mat[5];
+	m.m[2][1] = mat[9];
+	m.m[3][1] = mat[13];
+	m.m[0][2] = mat[2];
+	m.m[1][2] = mat[6];
+	m.m[2][2] = mat[10];
+	m.m[3][2] = mat[14];
+	m.m[0][3] = mat[3];
+	m.m[1][3] = mat[7];
+	m.m[2][3] = mat[11];
+	m.m[3][3] = mat[15];
+	return m;
 }
 
 static inline mat4_t
@@ -427,8 +431,8 @@ static inline mat4_t
 m4_transpose(mat4_t matrix)
 {
 	return mat4(matrix.m00, matrix.m01, matrix.m02, matrix.m03, matrix.m10, matrix.m11, matrix.m12,
-	            matrix.m13, matrix.m20, matrix.m21, matrix.m22, matrix.m23, matrix.m30, matrix.m31,
-	            matrix.m32, matrix.m33);
+				matrix.m13, matrix.m20, matrix.m21, matrix.m22, matrix.m23, matrix.m30, matrix.m31,
+				matrix.m32, matrix.m33);
 }
 
 /**
@@ -480,8 +484,8 @@ m4_rotation(float angle_in_rad, vec3_t axis)
 	float c = cosf(angle_in_rad), s = sinf(angle_in_rad);
 
 	return mat4(c + x * x * (1 - c), x * y * (1 - c) - z * s, x * z * (1 - c) + y * s, 0,
-	            y * x * (1 - c) + z * s, c + y * y * (1 - c), y * z * (1 - c) - x * s, 0,
-	            z * x * (1 - c) - y * s, z * y * (1 - c) + x * s, c + z * z * (1 - c), 0, 0, 0, 0, 1);
+				y * x * (1 - c) + z * s, c + y * y * (1 - c), y * z * (1 - c) - x * s, 0,
+				z * x * (1 - c) - y * s, z * y * (1 - c) + x * s, c + z * z * (1 - c), 0, 0, 0, 0, 1);
 }
 
 
@@ -544,9 +548,9 @@ m4_ortho(float left, float right, float bottom, float top, float back, float fro
  */
 mat4_t
 m4_perspective(float vertical_field_of_view_in_deg,
-               float aspect_ratio,
-               float near_view_distance,
-               float far_view_distance)
+			   float aspect_ratio,
+			   float near_view_distance,
+			   float far_view_distance)
 {
 	float fovy_in_rad = vertical_field_of_view_in_deg / 180 * M_PI;
 	float f = 1.0f / tanf(fovy_in_rad / 2.0f);
@@ -554,7 +558,7 @@ m4_perspective(float vertical_field_of_view_in_deg,
 	float nd = near_view_distance, fd = far_view_distance;
 
 	return mat4(f / ar, 0, 0, 0, 0, f, 0, 0, 0, 0, (fd + nd) / (nd - fd), (2 * fd * nd) / (nd - fd),
-	            0, 0, -1, 0);
+				0, 0, -1, 0);
 }
 
 /**
@@ -601,7 +605,7 @@ m4_look_at(vec3_t from, vec3_t to, vec3_t up)
 	vec3_t y = v3_cross(z, x);
 
 	return mat4(x.x, x.y, x.z, -v3_dot(from, x), y.x, y.y, y.z, -v3_dot(from, y), z.x, z.y, z.z,
-	            -v3_dot(from, z), 0, 0, 0, 1);
+				-v3_dot(from, z), 0, 0, 0, 1);
 }
 
 
@@ -666,8 +670,8 @@ m4_invert_affine(mat4_t matrix)
 
 	// Combine the inverted R with the inverted translation
 	return mat4(i00, i10, i20, -(i00 * m30 + i10 * m31 + i20 * m32), i01, i11, i21,
-	            -(i01 * m30 + i11 * m31 + i21 * m32), i02, i12, i22,
-	            -(i02 * m30 + i12 * m31 + i22 * m32), 0, 0, 0, 1);
+				-(i01 * m30 + i11 * m31 + i21 * m32), i02, i12, i22,
+				-(i02 * m30 + i12 * m31 + i22 * m32), 0, 0, 0, 1);
 }
 
 /**
@@ -681,12 +685,12 @@ vec3_t
 m4_mul_pos(mat4_t matrix, vec3_t position)
 {
 	vec3_t result = vec3(
-	    matrix.m00 * position.x + matrix.m10 * position.y + matrix.m20 * position.z + matrix.m30,
-	    matrix.m01 * position.x + matrix.m11 * position.y + matrix.m21 * position.z + matrix.m31,
-	    matrix.m02 * position.x + matrix.m12 * position.y + matrix.m22 * position.z + matrix.m32);
+		matrix.m00 * position.x + matrix.m10 * position.y + matrix.m20 * position.z + matrix.m30,
+		matrix.m01 * position.x + matrix.m11 * position.y + matrix.m21 * position.z + matrix.m31,
+		matrix.m02 * position.x + matrix.m12 * position.y + matrix.m22 * position.z + matrix.m32);
 
 	float w =
-	    matrix.m03 * position.x + matrix.m13 * position.y + matrix.m23 * position.z + matrix.m33;
+		matrix.m03 * position.x + matrix.m13 * position.y + matrix.m23 * position.z + matrix.m33;
 	if (w != 0 && w != 1)
 		return vec3(result.x / w, result.y / w, result.z / w);
 
@@ -709,9 +713,9 @@ vec3_t
 m4_mul_dir(mat4_t matrix, vec3_t direction)
 {
 	vec3_t result =
-	    vec3(matrix.m00 * direction.x + matrix.m10 * direction.y + matrix.m20 * direction.z,
-	         matrix.m01 * direction.x + matrix.m11 * direction.y + matrix.m21 * direction.z,
-	         matrix.m02 * direction.x + matrix.m12 * direction.y + matrix.m22 * direction.z);
+		vec3(matrix.m00 * direction.x + matrix.m10 * direction.y + matrix.m20 * direction.z,
+			 matrix.m01 * direction.x + matrix.m11 * direction.y + matrix.m21 * direction.z,
+			 matrix.m02 * direction.x + matrix.m12 * direction.y + matrix.m22 * direction.z);
 
 	float w = matrix.m03 * direction.x + matrix.m13 * direction.y + matrix.m23 * direction.z;
 	if (w != 0 && w != 1)
@@ -745,7 +749,7 @@ m4_fprintp(FILE* stream, mat4_t matrix, int width, int precision)
 	int w = width, p = precision;
 	for (int r = 0; r < 4; r++) {
 		fprintf(stream, "| %*.*f %*.*f %*.*f %*.*f |\n", w, p, m.m[0][r], w, p, m.m[1][r], w, p,
-		        m.m[2][r], w, p, m.m[3][r]);
+				m.m[2][r], w, p, m.m[3][r]);
 	}
 }
 

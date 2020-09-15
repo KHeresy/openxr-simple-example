@@ -10,11 +10,13 @@
 #include <stdio.h>
 #include <stdbool.h>
 
+#include <vector>
+
 #include "glimpl.h" // factored out rendering of a simple scene
 
-#define XR_USE_PLATFORM_XLIB
 #define XR_USE_GRAPHICS_API_OPENGL
-#include "openxr_headers/openxr.h"
+#define XR_USE_PLATFORM_WIN32
+#include "openxr/openxr.h"
 
 #include "xrmath.h" // math glue between OpenXR and OpenGL
 #include "math_3d.h"
@@ -23,7 +25,7 @@
 
 // we need an identity pose for creating spaces without offsets
 static XrPosef identity_pose = {.orientation = {.x = 0, .y = 0, .z = 0, .w = 1.0},
-                                .position = {.x = 0, .y = 0, .z = 0}};
+								.position = {.x = 0, .y = 0, .z = 0}};
 
 // small helper so we don't forget whether we treat 0 as left or right hand
 enum OPENXR_HANDS
@@ -74,7 +76,7 @@ typedef struct xr_example
 	XrView* views;
 
 	// The runtime interacts with the OpenGL images (textures) via a Swapchain.
-	XrGraphicsBindingOpenGLXlibKHR graphics_binding_gl;
+	XrGraphicsBindingOpenGLWin32KHR graphics_binding_gl;
 
 	int64_t swapchain_format;
 	// length of the swapchain per view. Usually all the same, but not required.
@@ -144,7 +146,7 @@ xr_result(XrInstance instance, XrResult result, const char* format, ...)
 
 	size_t len1 = strlen(format);
 	size_t len2 = strlen(resultString) + 1;
-	char *formatRes = malloc (sizeof(char) * (len1 + len2 + 4)); // + " []\n"
+	char *formatRes = new  char[len1 + len2 + 4]; // + " []\n"
 	sprintf(formatRes, "%s [%s]\n", format, resultString);
 
 	va_list args;
@@ -165,8 +167,8 @@ get_instance_properties(XrInstance instance)
 {
 	XrResult result;
 	XrInstanceProperties instance_props = {
-	    .type = XR_TYPE_INSTANCE_PROPERTIES,
-	    .next = NULL,
+		.type = XR_TYPE_INSTANCE_PROPERTIES,
+		.next = NULL,
 	};
 
 	result = xrGetInstanceProperties(instance, &instance_props);
@@ -175,25 +177,26 @@ get_instance_properties(XrInstance instance)
 
 	printf("Runtime Name: %s\n", instance_props.runtimeName);
 	printf("Runtime Version: %d.%d.%d\n", XR_VERSION_MAJOR(instance_props.runtimeVersion),
-	       XR_VERSION_MINOR(instance_props.runtimeVersion),
-	       XR_VERSION_PATCH(instance_props.runtimeVersion));
+		   XR_VERSION_MINOR(instance_props.runtimeVersion),
+		   XR_VERSION_PATCH(instance_props.runtimeVersion));
 }
 
 void
 print_system_properties(XrSystemProperties* system_properties, bool hand_tracking_ext)
 {
 	printf("System properties for system %lu: \"%s\", vendor ID %d\n", system_properties->systemId,
-	       system_properties->systemName, system_properties->vendorId);
+		   system_properties->systemName, system_properties->vendorId);
 	printf("\tMax layers          : %d\n", system_properties->graphicsProperties.maxLayerCount);
 	printf("\tMax swapchain height: %d\n",
-	       system_properties->graphicsProperties.maxSwapchainImageHeight);
+		   system_properties->graphicsProperties.maxSwapchainImageHeight);
 	printf("\tMax swapchain width : %d\n",
-	       system_properties->graphicsProperties.maxSwapchainImageWidth);
+		   system_properties->graphicsProperties.maxSwapchainImageWidth);
 	printf("\tOrientation Tracking: %d\n", system_properties->trackingProperties.orientationTracking);
 	printf("\tPosition Tracking   : %d\n", system_properties->trackingProperties.positionTracking);
 
 	if (hand_tracking_ext) {
-		XrSystemHandTrackingPropertiesEXT* ht = system_properties->next;
+		XrSystemHandTrackingPropertiesEXT* ht =
+		    (XrSystemHandTrackingPropertiesEXT*)system_properties->next;
 		printf("\tHand Tracking       : %d\n", ht->supportsHandTracking);
 	}
 }
@@ -205,25 +208,25 @@ print_supported_view_configs(xr_example* self)
 
 	uint32_t view_config_count;
 	result =
-	    xrEnumerateViewConfigurations(self->instance, self->system_id, 0, &view_config_count, NULL);
+		xrEnumerateViewConfigurations(self->instance, self->system_id, 0, &view_config_count, NULL);
 	if (!xr_result(self->instance, result, "Failed to get view configuration count"))
 		return;
 
 	printf("Runtime supports %d view configurations\n", view_config_count);
 
-	XrViewConfigurationType view_configs[view_config_count];
+	std::vector<XrViewConfigurationType> view_configs(view_config_count);
 	result = xrEnumerateViewConfigurations(self->instance, self->system_id, view_config_count,
-	                                       &view_config_count, view_configs);
+										   &view_config_count, view_configs.data());
 	if (!xr_result(self->instance, result, "Failed to enumerate view configurations!"))
 		return;
 
 	printf("Runtime supports view configurations:\n");
 	for (uint32_t i = 0; i < view_config_count; ++i) {
 		XrViewConfigurationProperties props = {.type = XR_TYPE_VIEW_CONFIGURATION_PROPERTIES,
-		                                       .next = NULL};
+											   .next = NULL};
 
 		result =
-		    xrGetViewConfigurationProperties(self->instance, self->system_id, view_configs[i], &props);
+			xrGetViewConfigurationProperties(self->instance, self->system_id, view_configs[i], &props);
 		if (!xr_result(self->instance, result, "Failed to get view configuration info %d!", i))
 			return;
 
@@ -237,13 +240,13 @@ print_viewconfig_view_info(xr_example* self)
 	for (uint32_t i = 0; i < self->view_count; i++) {
 		printf("View Configuration View %d:\n", i);
 		printf("\tResolution       : Recommended %dx%d, Max: %dx%d\n",
-		       self->viewconfig_views[0].recommendedImageRectWidth,
-		       self->viewconfig_views[0].recommendedImageRectHeight,
-		       self->viewconfig_views[0].maxImageRectWidth,
-		       self->viewconfig_views[0].maxImageRectHeight);
+			   self->viewconfig_views[0].recommendedImageRectWidth,
+			   self->viewconfig_views[0].recommendedImageRectHeight,
+			   self->viewconfig_views[0].maxImageRectWidth,
+			   self->viewconfig_views[0].maxImageRectHeight);
 		printf("\tSwapchain Samples: Recommended: %d, Max: %d)\n",
-		       self->viewconfig_views[0].recommendedSwapchainSampleCount,
-		       self->viewconfig_views[0].maxSwapchainSampleCount);
+			   self->viewconfig_views[0].recommendedSwapchainSampleCount,
+			   self->viewconfig_views[0].maxSwapchainSampleCount);
 	}
 }
 
@@ -252,18 +255,18 @@ check_opengl_version(XrGraphicsRequirementsOpenGLKHR* opengl_reqs)
 {
 	XrVersion desired_opengl_version = XR_MAKE_VERSION(3, 3, 0);
 	if (desired_opengl_version > opengl_reqs->maxApiVersionSupported ||
-	    desired_opengl_version < opengl_reqs->minApiVersionSupported) {
+		desired_opengl_version < opengl_reqs->minApiVersionSupported) {
 		printf(
-		    "We want OpenGL %d.%d.%d, but runtime only supports OpenGL "
-		    "%d.%d.%d - %d.%d.%d!\n",
-		    XR_VERSION_MAJOR(desired_opengl_version), XR_VERSION_MINOR(desired_opengl_version),
-		    XR_VERSION_PATCH(desired_opengl_version),
-		    XR_VERSION_MAJOR(opengl_reqs->minApiVersionSupported),
-		    XR_VERSION_MINOR(opengl_reqs->minApiVersionSupported),
-		    XR_VERSION_PATCH(opengl_reqs->minApiVersionSupported),
-		    XR_VERSION_MAJOR(opengl_reqs->maxApiVersionSupported),
-		    XR_VERSION_MINOR(opengl_reqs->maxApiVersionSupported),
-		    XR_VERSION_PATCH(opengl_reqs->maxApiVersionSupported));
+			"We want OpenGL %d.%d.%d, but runtime only supports OpenGL "
+			"%d.%d.%d - %d.%d.%d!\n",
+			XR_VERSION_MAJOR(desired_opengl_version), XR_VERSION_MINOR(desired_opengl_version),
+			XR_VERSION_PATCH(desired_opengl_version),
+			XR_VERSION_MAJOR(opengl_reqs->minApiVersionSupported),
+			XR_VERSION_MINOR(opengl_reqs->minApiVersionSupported),
+			XR_VERSION_PATCH(opengl_reqs->minApiVersionSupported),
+			XR_VERSION_MAJOR(opengl_reqs->maxApiVersionSupported),
+			XR_VERSION_MINOR(opengl_reqs->maxApiVersionSupported),
+			XR_VERSION_PATCH(opengl_reqs->maxApiVersionSupported));
 		return false;
 	}
 	return true;
@@ -279,8 +282,8 @@ print_reference_spaces(xr_example* self)
 	if (!xr_result(self->instance, result, "Getting number of reference spaces failed!"))
 		return;
 
-	XrReferenceSpaceType ref_spaces[ref_space_count];
-	result = xrEnumerateReferenceSpaces(self->session, ref_space_count, &ref_space_count, ref_spaces);
+	std::vector<XrReferenceSpaceType> ref_spaces(ref_space_count);
+	result = xrEnumerateReferenceSpaces(self->session, ref_space_count, &ref_space_count, ref_spaces.data());
 	if (!xr_result(self->instance, result, "Enumerating reference spaces failed!"))
 		return;
 
@@ -318,7 +321,7 @@ init_openxr(xr_example* self)
 
 	printf("Runtime supports %d extensions\n", ext_count);
 
-	XrExtensionProperties extensionProperties[ext_count];
+	std::vector<XrExtensionProperties> extensionProperties(ext_count);
 	for (uint16_t i = 0; i < ext_count; i++) {
 		// we usually have to fill in the type (for validation) and set
 		// next to NULL (or a pointer to an extension specific struct)
@@ -326,14 +329,14 @@ init_openxr(xr_example* self)
 		extensionProperties[i].next = NULL;
 	}
 
-	result = xrEnumerateInstanceExtensionProperties(NULL, ext_count, &ext_count, extensionProperties);
+	result = xrEnumerateInstanceExtensionProperties(NULL, ext_count, &ext_count, extensionProperties.data());
 	if (!xr_result(NULL, result, "Failed to enumerate extension properties"))
 		return 1;
 
 	bool opengl_ext = false;
 	for (uint32_t i = 0; i < ext_count; i++) {
 		printf("\t%s v%d\n", extensionProperties[i].extensionName,
-		       extensionProperties[i].extensionVersion);
+			   extensionProperties[i].extensionVersion);
 		if (strcmp(XR_KHR_OPENGL_ENABLE_EXTENSION_NAME, extensionProperties[i].extensionName) == 0) {
 			opengl_ext = true;
 		}
@@ -342,12 +345,12 @@ init_openxr(xr_example* self)
 		}
 
 		if (strcmp(XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME,
-		           extensionProperties[i].extensionName) == 0) {
+				   extensionProperties[i].extensionName) == 0) {
 			self->cylinder.supported = true;
 		}
 
 		if (strcmp(XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME,
-		           extensionProperties[i].extensionName) == 0) {
+				   extensionProperties[i].extensionName) == 0) {
 			self->depth.supported = true;
 		}
 	}
@@ -378,25 +381,21 @@ init_openxr(xr_example* self)
 	// same can be done for API layers, but API layers can also be enabled by env var
 
 	XrInstanceCreateInfo instance_create_info = {
-	    .type = XR_TYPE_INSTANCE_CREATE_INFO,
-	    .next = NULL,
-	    .createFlags = 0,
-	    .enabledExtensionCount = enabled_ext_count,
-	    .enabledExtensionNames = enabled_exts,
-	    .enabledApiLayerCount = 0,
-	    .enabledApiLayerNames = NULL,
-	    .applicationInfo =
-	        {
-	            // some compilers have trouble with char* initialization
-	            .applicationName = "",
-	            .engineName = "",
-	            .applicationVersion = 1,
-	            .engineVersion = 0,
-	            .apiVersion = XR_CURRENT_API_VERSION,
-	        },
+		XR_TYPE_INSTANCE_CREATE_INFO,
+		nullptr,
+		0,
+	    {
+	        "", 1,
+	        "", 0,
+	        XR_CURRENT_API_VERSION,
+	    },
+		0,
+		NULL,
+	    enabled_ext_count,
+		enabled_exts
 	};
 	strncpy(instance_create_info.applicationInfo.applicationName, "OpenXR OpenGL Example",
-	        XR_MAX_APPLICATION_NAME_SIZE);
+			XR_MAX_APPLICATION_NAME_SIZE);
 	strncpy(instance_create_info.applicationInfo.engineName, "Custom", XR_MAX_ENGINE_NAME_SIZE);
 
 	result = xrCreateInstance(&instance_create_info, &self->instance);
@@ -407,9 +406,8 @@ init_openxr(xr_example* self)
 	get_instance_properties(self->instance);
 
 	// --- Create XrSystem
-	XrSystemGetInfo system_get_info = {.type = XR_TYPE_SYSTEM_GET_INFO,
-	                                   .formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY,
-	                                   .next = NULL};
+	XrSystemGetInfo system_get_info = {.type = XR_TYPE_SYSTEM_GET_INFO, .next = NULL,
+									   .formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY };
 
 	result = xrGetSystem(self->instance, &system_get_info, &self->system_id);
 	if (!xr_result(self->instance, result, "Failed to get system for HMD form factor."))
@@ -422,14 +420,14 @@ init_openxr(xr_example* self)
 	// support
 	{
 		XrSystemProperties system_props = {
-		    .type = XR_TYPE_SYSTEM_PROPERTIES,
-		    .next = NULL,
-		    .graphicsProperties = {0},
-		    .trackingProperties = {0},
+			.type = XR_TYPE_SYSTEM_PROPERTIES,
+			.next = NULL,
+			.graphicsProperties = {0},
+			.trackingProperties = {0},
 		};
 
 		XrSystemHandTrackingPropertiesEXT ht = {.type = XR_TYPE_SYSTEM_HAND_TRACKING_PROPERTIES_EXT,
-		                                        .next = NULL};
+												.next = NULL};
 		if (self->hand_tracking.supported) {
 			system_props.next = &ht;
 		}
@@ -450,19 +448,19 @@ init_openxr(xr_example* self)
 	XrViewConfigurationType view_type = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
 
 	result = xrEnumerateViewConfigurationViews(self->instance, self->system_id, view_type, 0,
-	                                           &self->view_count, NULL);
+											   &self->view_count, NULL);
 	if (!xr_result(self->instance, result, "Failed to get view configuration view count!"))
 		return 1;
 
-	self->viewconfig_views = malloc(sizeof(XrViewConfigurationView) * self->view_count);
+	self->viewconfig_views = new XrViewConfigurationView[self->view_count];
 	for (uint32_t i = 0; i < self->view_count; i++) {
 		self->viewconfig_views[i].type = XR_TYPE_VIEW_CONFIGURATION_VIEW;
 		self->viewconfig_views[i].next = NULL;
 	}
 
 	result = xrEnumerateViewConfigurationViews(self->instance, self->system_id, view_type,
-	                                           self->view_count, &self->view_count,
-	                                           self->viewconfig_views);
+											   self->view_count, &self->view_count,
+											   self->viewconfig_views);
 	if (!xr_result(self->instance, result, "Failed to enumerate view configuration views!"))
 		return 1;
 	print_viewconfig_view_info(self);
@@ -470,12 +468,12 @@ init_openxr(xr_example* self)
 
 	// OpenXR requires checking graphics requirements before creating a session.
 	XrGraphicsRequirementsOpenGLKHR opengl_reqs = {.type = XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR,
-	                                               .next = NULL};
+												   .next = NULL};
 
 	PFN_xrGetOpenGLGraphicsRequirementsKHR pfnGetOpenGLGraphicsRequirementsKHR = NULL;
 	{
 		result = xrGetInstanceProcAddr(self->instance, "xrGetOpenGLGraphicsRequirementsKHR",
-		                               (PFN_xrVoidFunction*)&pfnGetOpenGLGraphicsRequirementsKHR);
+									   (PFN_xrVoidFunction*)&pfnGetOpenGLGraphicsRequirementsKHR);
 		if (!xr_result(self->instance, result, "Failed to get OpenGL graphics requirements function!"))
 			return 1;
 	}
@@ -490,17 +488,14 @@ init_openxr(xr_example* self)
 
 
 	// --- Create session
-	self->graphics_binding_gl = (XrGraphicsBindingOpenGLXlibKHR){
-	    .type = XR_TYPE_GRAPHICS_BINDING_OPENGL_XLIB_KHR,
+	self->graphics_binding_gl = XrGraphicsBindingOpenGLWin32KHR{
+	    .type = XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR,
 	};
 
 	// create SDL window the size of the left eye & fill GL graphics binding info
-	if (!init_sdl_window(&self->graphics_binding_gl.xDisplay, &self->graphics_binding_gl.visualid,
-	                     &self->graphics_binding_gl.glxFBConfig,
-	                     &self->graphics_binding_gl.glxDrawable,
-	                     &self->graphics_binding_gl.glxContext,
-	                     self->viewconfig_views[0].recommendedImageRectWidth,
-	                     self->viewconfig_views[0].recommendedImageRectHeight)) {
+	if (!init_sdl_window(self->graphics_binding_gl.hDC, self->graphics_binding_gl.hGLRC,
+						 self->viewconfig_views[0].recommendedImageRectWidth,
+						 self->viewconfig_views[0].recommendedImageRectHeight)) {
 		printf("GLX init failed!\n");
 		return 1;
 	}
@@ -517,8 +512,8 @@ init_openxr(xr_example* self)
 	self->state = XR_SESSION_STATE_UNKNOWN;
 
 	XrSessionCreateInfo session_create_info = {.type = XR_TYPE_SESSION_CREATE_INFO,
-	                                           .next = &self->graphics_binding_gl,
-	                                           .systemId = self->system_id};
+											   .next = &self->graphics_binding_gl,
+											   .systemId = self->system_id};
 
 	result = xrCreateSession(self->instance, &session_create_info, &self->session);
 	if (!xr_result(self->instance, result, "Failed to create session"))
@@ -528,26 +523,26 @@ init_openxr(xr_example* self)
 
 	if (self->hand_tracking.system_supported) {
 		result =
-		    xrGetInstanceProcAddr(self->instance, "xrLocateHandJointsEXT",
-		                          (PFN_xrVoidFunction*)&self->hand_tracking.pfnLocateHandJointsEXT);
+			xrGetInstanceProcAddr(self->instance, "xrLocateHandJointsEXT",
+								  (PFN_xrVoidFunction*)&self->hand_tracking.pfnLocateHandJointsEXT);
 
 		xr_result(self->instance, result, "Failed to get xrLocateHandJointsEXT function!");
 
 		PFN_xrCreateHandTrackerEXT pfnCreateHandTrackerEXT = NULL;
 		result = xrGetInstanceProcAddr(self->instance, "xrCreateHandTrackerEXT",
-		                               (PFN_xrVoidFunction*)&pfnCreateHandTrackerEXT);
+									   (PFN_xrVoidFunction*)&pfnCreateHandTrackerEXT);
 
 		if (!xr_result(self->instance, result, "Failed to get xrCreateHandTrackerEXT function!"))
 			return 1;
 
 		{
 			XrHandTrackerCreateInfoEXT hand_tracker_create_info = {
-			    .type = XR_TYPE_HAND_TRACKER_CREATE_INFO_EXT,
-			    .next = NULL,
-			    .hand = XR_HAND_LEFT_EXT,
-			    .handJointSet = XR_HAND_JOINT_SET_DEFAULT_EXT};
+				.type = XR_TYPE_HAND_TRACKER_CREATE_INFO_EXT,
+				.next = NULL,
+				.hand = XR_HAND_LEFT_EXT,
+				.handJointSet = XR_HAND_JOINT_SET_DEFAULT_EXT};
 			result = pfnCreateHandTrackerEXT(self->session, &hand_tracker_create_info,
-			                                 &self->hand_tracking.trackers[HAND_LEFT]);
+											 &self->hand_tracking.trackers[HAND_LEFT]);
 			if (!xr_result(self->instance, result, "Failed to create left hand tracker")) {
 				return 1;
 			}
@@ -555,12 +550,12 @@ init_openxr(xr_example* self)
 		}
 		{
 			XrHandTrackerCreateInfoEXT hand_tracker_create_info = {
-			    .type = XR_TYPE_HAND_TRACKER_CREATE_INFO_EXT,
-			    .next = NULL,
-			    .hand = XR_HAND_RIGHT_EXT,
-			    .handJointSet = XR_HAND_JOINT_SET_DEFAULT_EXT};
+				.type = XR_TYPE_HAND_TRACKER_CREATE_INFO_EXT,
+				.next = NULL,
+				.hand = XR_HAND_RIGHT_EXT,
+				.handJointSet = XR_HAND_JOINT_SET_DEFAULT_EXT};
 			result = pfnCreateHandTrackerEXT(self->session, &hand_tracker_create_info,
-			                                 &self->hand_tracking.trackers[HAND_RIGHT]);
+											 &self->hand_tracking.trackers[HAND_RIGHT]);
 			if (!xr_result(self->instance, result, "Failed to create right hand tracker")) {
 				return 1;
 			}
@@ -573,9 +568,9 @@ init_openxr(xr_example* self)
 	print_reference_spaces(self);
 
 	XrReferenceSpaceCreateInfo play_space_create_info = {.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO,
-	                                                     .next = NULL,
-	                                                     .referenceSpaceType = play_space_type,
-	                                                     .poseInReferenceSpace = identity_pose};
+														 .next = NULL,
+														 .referenceSpaceType = play_space_type,
+														 .poseInReferenceSpace = identity_pose};
 
 	result = xrCreateReferenceSpace(self->session, &play_space_create_info, &self->play_space);
 	if (!xr_result(self->instance, result, "Failed to create play space!"))
@@ -583,7 +578,7 @@ init_openxr(xr_example* self)
 
 	// --- Begin session
 	XrSessionBeginInfo session_begin_info = {
-	    .type = XR_TYPE_SESSION_BEGIN_INFO, .next = NULL, .primaryViewConfigurationType = view_type};
+		.type = XR_TYPE_SESSION_BEGIN_INFO, .next = NULL, .primaryViewConfigurationType = view_type};
 	result = xrBeginSession(self->session, &session_begin_info);
 	if (!xr_result(self->instance, result, "Failed to begin session!"))
 		return 1;
@@ -598,14 +593,14 @@ init_openxr(xr_example* self)
 		return 1;
 
 	printf("Runtime supports %d swapchain formats\n", swapchain_format_count);
-	int64_t swapchain_formats[swapchain_format_count];
+	std::vector<int64_t> swapchain_formats(swapchain_format_count);
 	result = xrEnumerateSwapchainFormats(self->session, swapchain_format_count,
-	                                     &swapchain_format_count, swapchain_formats);
+										 &swapchain_format_count, swapchain_formats.data());
 	if (!xr_result(self->instance, result, "Failed to enumerate swapchain formats"))
 		return 1;
 
 	// SRGB is usually the best choice. Selection logic should be expanded though.
-	int64_t preferred_swapchain_format = GL_SRGB8_ALPHA8_EXT;
+	int64_t preferred_swapchain_format = GL_SRGB8_ALPHA8;
 	// Using a depth format that directly maps to vulkan is a good idea:
 	// GL_DEPTH_COMPONENT16, GL_DEPTH_COMPONENT32F
 	int64_t preferred_depth_swapchain_format = GL_DEPTH_COMPONENT32F;
@@ -640,23 +635,22 @@ init_openxr(xr_example* self)
 	 * Here we use one swapchain per view (eye), and for example 3 ("triple buffering") images per
 	 * swapchain.
 	 */
-	self->swapchains = malloc(sizeof(XrSwapchain) * self->view_count);
-	self->swapchain_lengths = malloc(sizeof(uint32_t) * self->view_count);
-	self->images = malloc(sizeof(XrSwapchainImageOpenGLKHR*) * self->view_count);
+	self->swapchains = new XrSwapchain[self->view_count];
+	self->swapchain_lengths = new uint32_t[self->view_count];
+	self->images = new XrSwapchainImageOpenGLKHR*[ self->view_count];
 	for (uint32_t i = 0; i < self->view_count; i++) {
-		XrSwapchainCreateInfo swapchain_create_info = {
-		    .type = XR_TYPE_SWAPCHAIN_CREATE_INFO,
-		    .usageFlags = XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT,
-		    .createFlags = 0,
-		    .format = self->swapchain_format,
-		    .sampleCount = self->viewconfig_views[i].recommendedSwapchainSampleCount,
-		    .width = self->viewconfig_views[i].recommendedImageRectWidth,
-		    .height = self->viewconfig_views[i].recommendedImageRectHeight,
-		    .faceCount = 1,
-		    .arraySize = 1,
-		    .mipCount = 1,
-		    .next = NULL,
-		};
+		XrSwapchainCreateInfo swapchain_create_info;
+		swapchain_create_info.type = XR_TYPE_SWAPCHAIN_CREATE_INFO;
+		swapchain_create_info.usageFlags = XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT;
+		swapchain_create_info.createFlags = 0;
+		swapchain_create_info.format = self->swapchain_format;
+		swapchain_create_info.sampleCount = self->viewconfig_views[i].recommendedSwapchainSampleCount;
+		swapchain_create_info.width = self->viewconfig_views[i].recommendedImageRectWidth;
+		swapchain_create_info.height = self->viewconfig_views[i].recommendedImageRectHeight;
+		swapchain_create_info.faceCount = 1;
+		swapchain_create_info.arraySize = 1;
+		swapchain_create_info.mipCount = 1;
+		swapchain_create_info.next = NULL;
 
 		result = xrCreateSwapchain(self->session, &swapchain_create_info, &self->swapchains[i]);
 		if (!xr_result(self->instance, result, "Failed to create swapchain %d!", i))
@@ -667,14 +661,14 @@ init_openxr(xr_example* self)
 			return 1;
 
 		// these are wrappers for the actual OpenGL texture id
-		self->images[i] = malloc(sizeof(XrSwapchainImageOpenGLKHR) * self->swapchain_lengths[i]);
+		self->images[i] = new XrSwapchainImageOpenGLKHR[ self->swapchain_lengths[i]];
 		for (uint32_t j = 0; j < self->swapchain_lengths[i]; j++) {
 			self->images[i][j].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
 			self->images[i][j].next = NULL;
 		}
 		result = xrEnumerateSwapchainImages(self->swapchains[i], self->swapchain_lengths[i],
-		                                    &self->swapchain_lengths[i],
-		                                    (XrSwapchainImageBaseHeader*)self->images[i]);
+											&self->swapchain_lengths[i],
+											(XrSwapchainImageBaseHeader*)self->images[i]);
 		if (!xr_result(self->instance, result, "Failed to enumerate swapchain images"))
 			return 1;
 	}
@@ -684,55 +678,53 @@ init_openxr(xr_example* self)
 	 * For this, we create one framebuffer per OpenGL texture.
 	 * This is not mandated by OpenXR, other ways to render to textures will work too.
 	 */
-	self->framebuffers = malloc(sizeof(GLuint*) * self->view_count);
+	self->framebuffers = new GLuint*[self->view_count];
 	for (uint32_t i = 0; i < self->view_count; i++) {
-		self->framebuffers[i] = malloc(sizeof(GLuint) * self->swapchain_lengths[i]);
+		self->framebuffers[i] = new GLuint[self->swapchain_lengths[i]];
 		glGenFramebuffers(self->swapchain_lengths[i], self->framebuffers[i]);
 	}
 
 	if (self->depth_swapchain_format == -1) {
 		printf("Preferred depth swapchain format %#lx not supported!\n",
-		       preferred_depth_swapchain_format);
+			   preferred_depth_swapchain_format);
 	}
 
 	if (self->depth_swapchain_format != -1) {
-		self->depth_swapchains = malloc(sizeof(XrSwapchain) * self->view_count);
-		self->depth_swapchain_lengths = malloc(sizeof(uint32_t) * self->view_count);
-		self->depth_images = malloc(sizeof(XrSwapchainImageOpenGLKHR*) * self->view_count);
+		self->depth_swapchains = new XrSwapchain[self->view_count];
+		self->depth_swapchain_lengths = new uint32_t[self->view_count];
+		self->depth_images = new XrSwapchainImageOpenGLKHR*[ self->view_count];
 		for (uint32_t i = 0; i < self->view_count; i++) {
-			XrSwapchainCreateInfo swapchain_create_info = {
-			    .type = XR_TYPE_SWAPCHAIN_CREATE_INFO,
-			    .usageFlags = XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-			    .createFlags = 0,
-			    .format = self->depth_swapchain_format,
-			    .sampleCount = self->viewconfig_views[i].recommendedSwapchainSampleCount,
-			    .width = self->viewconfig_views[i].recommendedImageRectWidth,
-			    .height = self->viewconfig_views[i].recommendedImageRectHeight,
-			    .faceCount = 1,
-			    .arraySize = 1,
-			    .mipCount = 1,
-			    .next = NULL,
-			};
+			XrSwapchainCreateInfo swapchain_create_info;
+			swapchain_create_info.type = XR_TYPE_SWAPCHAIN_CREATE_INFO;
+			swapchain_create_info.usageFlags = XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+			swapchain_create_info.createFlags = 0;
+			swapchain_create_info.format = self->depth_swapchain_format;
+			swapchain_create_info.sampleCount = self->viewconfig_views[i].recommendedSwapchainSampleCount;
+			swapchain_create_info.width = self->viewconfig_views[i].recommendedImageRectWidth;
+			swapchain_create_info.height = self->viewconfig_views[i].recommendedImageRectHeight;
+			swapchain_create_info.faceCount = 1;
+			swapchain_create_info.arraySize = 1;
+			swapchain_create_info.mipCount = 1;
+			swapchain_create_info.next = NULL;
 
 			result = xrCreateSwapchain(self->session, &swapchain_create_info, &self->depth_swapchains[i]);
 			if (!xr_result(self->instance, result, "Failed to create swapchain %d!", i))
 				return 1;
 
 			result = xrEnumerateSwapchainImages(self->depth_swapchains[i], 0,
-			                                    &self->depth_swapchain_lengths[i], NULL);
+												&self->depth_swapchain_lengths[i], NULL);
 			if (!xr_result(self->instance, result, "Failed to enumerate swapchains"))
 				return 1;
 
 			// these are wrappers for the actual OpenGL texture id
-			self->depth_images[i] =
-			    malloc(sizeof(XrSwapchainImageOpenGLKHR) * self->depth_swapchain_lengths[i]);
+			self->depth_images[i] =new XrSwapchainImageOpenGLKHR[ self->depth_swapchain_lengths[i]];
 			for (uint32_t j = 0; j < self->depth_swapchain_lengths[i]; j++) {
 				self->depth_images[i][j].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
 				self->depth_images[i][j].next = NULL;
 			}
 			result = xrEnumerateSwapchainImages(
-			    self->depth_swapchains[i], self->depth_swapchain_lengths[i],
-			    &self->depth_swapchain_lengths[i], (XrSwapchainImageBaseHeader*)self->depth_images[i]);
+				self->depth_swapchains[i], self->depth_swapchain_lengths[i],
+				&self->depth_swapchain_lengths[i], (XrSwapchainImageBaseHeader*)self->depth_images[i]);
 			if (!xr_result(self->instance, result, "Failed to enumerate swapchain images"))
 				return 1;
 		}
@@ -741,38 +733,37 @@ init_openxr(xr_example* self)
 	{
 		self->quad_pixel_width = 800;
 		self->quad_pixel_height = 600;
-		XrSwapchainCreateInfo swapchain_create_info = {
-		    .type = XR_TYPE_SWAPCHAIN_CREATE_INFO,
-		    .usageFlags = XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT,
-		    .createFlags = 0,
-		    .format = self->quad_swapchain_format,
-		    .sampleCount = 1,
-		    .width = self->quad_pixel_width,
-		    .height = self->quad_pixel_height,
-		    .faceCount = 1,
-		    .arraySize = 1,
-		    .mipCount = 1,
-		    .next = NULL,
-		};
+		XrSwapchainCreateInfo swapchain_create_info;
+		swapchain_create_info.type = XR_TYPE_SWAPCHAIN_CREATE_INFO;
+		swapchain_create_info.usageFlags = XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT;
+		swapchain_create_info.createFlags = 0;
+		swapchain_create_info.format = self->quad_swapchain_format;
+		swapchain_create_info.sampleCount = 1;
+		swapchain_create_info.width = self->quad_pixel_width;
+		swapchain_create_info.height = self->quad_pixel_height;
+		swapchain_create_info.faceCount = 1;
+		swapchain_create_info.arraySize = 1;
+		swapchain_create_info.mipCount = 1;
+		swapchain_create_info.next = NULL;
 
 		result = xrCreateSwapchain(self->session, &swapchain_create_info, &self->quad_swapchain);
 		if (!xr_result(self->instance, result, "Failed to create swapchain!"))
 			return 1;
 
 		result =
-		    xrEnumerateSwapchainImages(self->quad_swapchain, 0, &self->quad_swapchain_length, NULL);
+			xrEnumerateSwapchainImages(self->quad_swapchain, 0, &self->quad_swapchain_length, NULL);
 		if (!xr_result(self->instance, result, "Failed to enumerate swapchains"))
 			return 1;
 
 		// these are wrappers for the actual OpenGL texture id
-		self->quad_images = malloc(sizeof(XrSwapchainImageOpenGLKHR) * self->quad_swapchain_length);
+		self->quad_images = new XrSwapchainImageOpenGLKHR[ self->quad_swapchain_length];
 		for (uint32_t j = 0; j < self->quad_swapchain_length; j++) {
 			self->quad_images[j].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
 			self->quad_images[j].next = NULL;
 		}
 		result = xrEnumerateSwapchainImages(self->quad_swapchain, self->quad_swapchain_length,
-		                                    &self->quad_swapchain_length,
-		                                    (XrSwapchainImageBaseHeader*)self->quad_images);
+											&self->quad_swapchain_length,
+											(XrSwapchainImageBaseHeader*)self->quad_images);
 		if (!xr_result(self->instance, result, "Failed to enumerate swapchain images"))
 			return 1;
 	}
@@ -780,39 +771,37 @@ init_openxr(xr_example* self)
 	if (self->cylinder.supported) {
 		self->cylinder.swapchain_width = 800;
 		self->cylinder.swapchain_height = 600;
-		XrSwapchainCreateInfo swapchain_create_info = {
-		    .type = XR_TYPE_SWAPCHAIN_CREATE_INFO,
-		    .usageFlags = XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT,
-		    .createFlags = 0,
-		    .format = self->cylinder.format,
-		    .sampleCount = 1,
-		    .width = self->cylinder.swapchain_width,
-		    .height = self->cylinder.swapchain_height,
-		    .faceCount = 1,
-		    .arraySize = 1,
-		    .mipCount = 1,
-		    .next = NULL,
-		};
+		XrSwapchainCreateInfo swapchain_create_info;
+		swapchain_create_info.type = XR_TYPE_SWAPCHAIN_CREATE_INFO;
+		swapchain_create_info.usageFlags = XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT;
+		swapchain_create_info.createFlags = 0;
+		swapchain_create_info.format = self->cylinder.format;
+		swapchain_create_info.sampleCount = 1;
+		swapchain_create_info.width = self->cylinder.swapchain_width;
+		swapchain_create_info.height = self->cylinder.swapchain_height;
+		swapchain_create_info.faceCount = 1;
+		swapchain_create_info.arraySize = 1;
+		swapchain_create_info.mipCount = 1;
+		swapchain_create_info.next = NULL;
 
 		result = xrCreateSwapchain(self->session, &swapchain_create_info, &self->cylinder.swapchain);
 		if (!xr_result(self->instance, result, "Failed to create swapchain!"))
 			return 1;
 
 		result = xrEnumerateSwapchainImages(self->cylinder.swapchain, 0,
-		                                    &self->cylinder.swapchain_length, NULL);
+											&self->cylinder.swapchain_length, NULL);
 		if (!xr_result(self->instance, result, "Failed to enumerate swapchains"))
 			return 1;
 
 		// these are wrappers for the actual OpenGL texture id
-		self->cylinder.images =
-		    malloc(sizeof(XrSwapchainImageOpenGLKHR) * self->cylinder.swapchain_length);
+		self->cylinder.images = new XrSwapchainImageOpenGLKHR[ self->cylinder.swapchain_length];
 		for (uint32_t j = 0; j < self->cylinder.swapchain_length; j++) {
 			self->cylinder.images[j].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
 			self->cylinder.images[j].next = NULL;
 		}
 		result = xrEnumerateSwapchainImages(self->cylinder.swapchain, self->cylinder.swapchain_length,
-		                                    &self->cylinder.swapchain_length,
-		                                    (XrSwapchainImageBaseHeader*)self->cylinder.images);
+											&self->cylinder.swapchain_length,
+											(XrSwapchainImageBaseHeader*)self->cylinder.images);
 		if (!xr_result(self->instance, result, "Failed to enumerate swapchain images"))
 			return 1;
 	}
@@ -825,7 +814,7 @@ init_openxr(xr_example* self)
 	// So we need to allocate a bunch of memory for data structures dynamically.
 	self->views = (XrView*)malloc(sizeof(XrView) * self->view_count);
 	self->projection_views = (XrCompositionLayerProjectionView*)malloc(
-	    sizeof(XrCompositionLayerProjectionView) * self->view_count);
+		sizeof(XrCompositionLayerProjectionView) * self->view_count);
 	for (uint32_t i = 0; i < self->view_count; i++) {
 		self->views[i].type = XR_TYPE_VIEW;
 		self->views[i].next = NULL;
@@ -838,9 +827,9 @@ init_openxr(xr_example* self)
 		self->projection_views[i].subImage.imageRect.offset.x = 0;
 		self->projection_views[i].subImage.imageRect.offset.y = 0;
 		self->projection_views[i].subImage.imageRect.extent.width =
-		    self->viewconfig_views[i].recommendedImageRectWidth;
+			self->viewconfig_views[i].recommendedImageRectWidth;
 		self->projection_views[i].subImage.imageRect.extent.height =
-		    self->viewconfig_views[i].recommendedImageRectHeight;
+			self->viewconfig_views[i].recommendedImageRectHeight;
 
 		// projection_views[i].pose (and fov) have to be filled every frame in frame loop
 	};
@@ -848,7 +837,7 @@ init_openxr(xr_example* self)
 	// analog to projection layer allocation, though we can actually fill everything in here
 	if (self->depth.supported) {
 		self->depth.infos = (XrCompositionLayerDepthInfoKHR*)malloc(
-		    sizeof(XrCompositionLayerDepthInfoKHR) * self->view_count);
+			sizeof(XrCompositionLayerDepthInfoKHR) * self->view_count);
 		for (uint32_t i = 0; i < self->view_count; i++) {
 			self->depth.infos[i].type = XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR;
 			self->depth.infos[i].next = NULL;
@@ -863,9 +852,9 @@ init_openxr(xr_example* self)
 			self->depth.infos[i].subImage.imageRect.offset.x = 0;
 			self->depth.infos[i].subImage.imageRect.offset.y = 0;
 			self->depth.infos[i].subImage.imageRect.extent.width =
-			    self->viewconfig_views[i].recommendedImageRectWidth;
+				self->viewconfig_views[i].recommendedImageRectWidth;
 			self->depth.infos[i].subImage.imageRect.extent.height =
-			    self->viewconfig_views[i].recommendedImageRectHeight;
+				self->viewconfig_views[i].recommendedImageRectHeight;
 
 			self->projection_views[i].next = &self->depth.infos[i];
 		};
@@ -880,7 +869,7 @@ main_loop(xr_example* self)
 	XrResult result;
 
 	XrActionSetCreateInfo main_actionset_info = {
-	    .type = XR_TYPE_ACTION_SET_CREATE_INFO, .next = NULL, .priority = 0};
+		.type = XR_TYPE_ACTION_SET_CREATE_INFO, .next = NULL, .priority = 0};
 	strcpy(main_actionset_info.actionSetName, "mainactions");
 	strcpy(main_actionset_info.localizedActionSetName, "Main Actions");
 
@@ -895,10 +884,10 @@ main_loop(xr_example* self)
 	XrAction grab_action_float;
 	{
 		XrActionCreateInfo action_info = {.type = XR_TYPE_ACTION_CREATE_INFO,
-		                                  .next = NULL,
-		                                  .actionType = XR_ACTION_TYPE_FLOAT_INPUT,
-		                                  .countSubactionPaths = HAND_COUNT,
-		                                  .subactionPaths = self->hand_paths};
+										  .next = NULL,
+										  .actionType = XR_ACTION_TYPE_FLOAT_INPUT,
+										  .countSubactionPaths = HAND_COUNT,
+										  .subactionPaths = self->hand_paths};
 		strcpy(action_info.actionName, "grabobjectfloat");
 		strcpy(action_info.localizedActionName, "Grab Object");
 
@@ -911,10 +900,10 @@ main_loop(xr_example* self)
 	XrAction throttle_action_float;
 	{
 		XrActionCreateInfo action_info = {.type = XR_TYPE_ACTION_CREATE_INFO,
-		                                  .next = NULL,
-		                                  .actionType = XR_ACTION_TYPE_FLOAT_INPUT,
-		                                  .countSubactionPaths = HAND_COUNT,
-		                                  .subactionPaths = self->hand_paths};
+										  .next = NULL,
+										  .actionType = XR_ACTION_TYPE_FLOAT_INPUT,
+										  .countSubactionPaths = HAND_COUNT,
+										  .subactionPaths = self->hand_paths};
 		strcpy(action_info.actionName, "throttle");
 		strcpy(action_info.localizedActionName, "Use Throttle forward/backward");
 
@@ -926,10 +915,10 @@ main_loop(xr_example* self)
 	XrAction pose_action;
 	{
 		XrActionCreateInfo action_info = {.type = XR_TYPE_ACTION_CREATE_INFO,
-		                                  .next = NULL,
-		                                  .actionType = XR_ACTION_TYPE_POSE_INPUT,
-		                                  .countSubactionPaths = HAND_COUNT,
-		                                  .subactionPaths = self->hand_paths};
+										  .next = NULL,
+										  .actionType = XR_ACTION_TYPE_POSE_INPUT,
+										  .countSubactionPaths = HAND_COUNT,
+										  .subactionPaths = self->hand_paths};
 		strcpy(action_info.actionName, "handpose");
 		strcpy(action_info.localizedActionName, "Hand Pose");
 
@@ -941,10 +930,10 @@ main_loop(xr_example* self)
 	XrAction haptic_action;
 	{
 		XrActionCreateInfo action_info = {.type = XR_TYPE_ACTION_CREATE_INFO,
-		                                  .next = NULL,
-		                                  .actionType = XR_ACTION_TYPE_VIBRATION_OUTPUT,
-		                                  .countSubactionPaths = HAND_COUNT,
-		                                  .subactionPaths = self->hand_paths};
+										  .next = NULL,
+										  .actionType = XR_ACTION_TYPE_VIBRATION_OUTPUT,
+										  .countSubactionPaths = HAND_COUNT,
+										  .subactionPaths = self->hand_paths};
 		strcpy(action_info.actionName, "haptic");
 		strcpy(action_info.localizedActionName, "Haptic Vibration");
 		result = xrCreateAction(main_actionset, &action_info, &haptic_action);
@@ -954,21 +943,21 @@ main_loop(xr_example* self)
 
 	XrPath select_click_path[HAND_COUNT];
 	xrStringToPath(self->instance, "/user/hand/left/input/select/click",
-	               &select_click_path[HAND_LEFT]);
+				   &select_click_path[HAND_LEFT]);
 	xrStringToPath(self->instance, "/user/hand/right/input/select/click",
-	               &select_click_path[HAND_RIGHT]);
+				   &select_click_path[HAND_RIGHT]);
 
 	XrPath trigger_value_path[HAND_COUNT];
 	xrStringToPath(self->instance, "/user/hand/left/input/trigger/value",
-	               &trigger_value_path[HAND_LEFT]);
+				   &trigger_value_path[HAND_LEFT]);
 	xrStringToPath(self->instance, "/user/hand/right/input/trigger/value",
-	               &trigger_value_path[HAND_RIGHT]);
+				   &trigger_value_path[HAND_RIGHT]);
 
 	XrPath thumbstick_y_path[HAND_COUNT];
 	xrStringToPath(self->instance, "/user/hand/left/input/thumbstick/y",
-	               &thumbstick_y_path[HAND_LEFT]);
+				   &thumbstick_y_path[HAND_LEFT]);
 	xrStringToPath(self->instance, "/user/hand/right/input/thumbstick/y",
-	               &thumbstick_y_path[HAND_RIGHT]);
+				   &thumbstick_y_path[HAND_RIGHT]);
 
 	XrPath grip_pose_path[HAND_COUNT];
 	xrStringToPath(self->instance, "/user/hand/left/input/grip/pose", &grip_pose_path[HAND_LEFT]);
@@ -981,25 +970,25 @@ main_loop(xr_example* self)
 	{
 		XrPath interaction_profile_path;
 		result = xrStringToPath(self->instance, "/interaction_profiles/khr/simple_controller",
-		                        &interaction_profile_path);
+								&interaction_profile_path);
 		if (!xr_result(self->instance, result, "failed to get interaction profile"))
 			return;
 
 		const XrActionSuggestedBinding bindings[] = {
-		    {.action = pose_action, .binding = grip_pose_path[HAND_LEFT]},
-		    {.action = pose_action, .binding = grip_pose_path[HAND_RIGHT]},
-		    {.action = grab_action_float, .binding = select_click_path[HAND_LEFT]},
-		    {.action = grab_action_float, .binding = select_click_path[HAND_RIGHT]},
-		    {.action = haptic_action, .binding = haptic_path[HAND_LEFT]},
-		    {.action = haptic_action, .binding = haptic_path[HAND_RIGHT]},
+			{.action = pose_action, .binding = grip_pose_path[HAND_LEFT]},
+			{.action = pose_action, .binding = grip_pose_path[HAND_RIGHT]},
+			{.action = grab_action_float, .binding = select_click_path[HAND_LEFT]},
+			{.action = grab_action_float, .binding = select_click_path[HAND_RIGHT]},
+			{.action = haptic_action, .binding = haptic_path[HAND_LEFT]},
+			{.action = haptic_action, .binding = haptic_path[HAND_RIGHT]},
 		};
 
 		const XrInteractionProfileSuggestedBinding suggested_bindings = {
-		    .type = XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING,
-		    .next = NULL,
-		    .interactionProfile = interaction_profile_path,
-		    .countSuggestedBindings = sizeof(bindings) / sizeof(bindings[0]),
-		    .suggestedBindings = bindings};
+			.type = XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING,
+			.next = NULL,
+			.interactionProfile = interaction_profile_path,
+			.countSuggestedBindings = sizeof(bindings) / sizeof(bindings[0]),
+			.suggestedBindings = bindings};
 
 		xrSuggestInteractionProfileBindings(self->instance, &suggested_bindings);
 		if (!xr_result(self->instance, result, "failed to suggest bindings"))
@@ -1009,27 +998,27 @@ main_loop(xr_example* self)
 	{
 		XrPath interaction_profile_path;
 		result = xrStringToPath(self->instance, "/interaction_profiles/valve/index_controller",
-		                        &interaction_profile_path);
+								&interaction_profile_path);
 		if (!xr_result(self->instance, result, "failed to get interaction profile"))
 			return;
 
 		const XrActionSuggestedBinding bindings[] = {
-		    {.action = pose_action, .binding = grip_pose_path[HAND_LEFT]},
-		    {.action = pose_action, .binding = grip_pose_path[HAND_RIGHT]},
-		    {.action = grab_action_float, .binding = trigger_value_path[HAND_LEFT]},
-		    {.action = grab_action_float, .binding = trigger_value_path[HAND_RIGHT]},
-		    {.action = throttle_action_float, .binding = thumbstick_y_path[HAND_LEFT]},
-		    {.action = throttle_action_float, .binding = thumbstick_y_path[HAND_RIGHT]},
-		    {.action = haptic_action, .binding = haptic_path[HAND_LEFT]},
-		    {.action = haptic_action, .binding = haptic_path[HAND_RIGHT]},
+			{.action = pose_action, .binding = grip_pose_path[HAND_LEFT]},
+			{.action = pose_action, .binding = grip_pose_path[HAND_RIGHT]},
+			{.action = grab_action_float, .binding = trigger_value_path[HAND_LEFT]},
+			{.action = grab_action_float, .binding = trigger_value_path[HAND_RIGHT]},
+			{.action = throttle_action_float, .binding = thumbstick_y_path[HAND_LEFT]},
+			{.action = throttle_action_float, .binding = thumbstick_y_path[HAND_RIGHT]},
+			{.action = haptic_action, .binding = haptic_path[HAND_LEFT]},
+			{.action = haptic_action, .binding = haptic_path[HAND_RIGHT]},
 		};
 
 		const XrInteractionProfileSuggestedBinding suggested_bindings = {
-		    .type = XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING,
-		    .next = NULL,
-		    .interactionProfile = interaction_profile_path,
-		    .countSuggestedBindings = sizeof(bindings) / sizeof(bindings[0]),
-		    .suggestedBindings = bindings};
+			.type = XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING,
+			.next = NULL,
+			.interactionProfile = interaction_profile_path,
+			.countSuggestedBindings = sizeof(bindings) / sizeof(bindings[0]),
+			.suggestedBindings = bindings};
 
 		xrSuggestInteractionProfileBindings(self->instance, &suggested_bindings);
 		if (!xr_result(self->instance, result, "failed to suggest bindings"))
@@ -1039,34 +1028,36 @@ main_loop(xr_example* self)
 	// poses can't be queried directly, we need to create a space for each
 	XrSpace pose_action_spaces[HAND_COUNT];
 	{
-		XrActionSpaceCreateInfo action_space_info = {.type = XR_TYPE_ACTION_SPACE_CREATE_INFO,
-		                                             .next = NULL,
-		                                             .action = pose_action,
-		                                             .poseInActionSpace = identity_pose,
-		                                             .subactionPath = self->hand_paths[HAND_LEFT]};
+		XrActionSpaceCreateInfo action_space_info;
+		action_space_info.type = XR_TYPE_ACTION_SPACE_CREATE_INFO;
+		action_space_info.next = NULL;
+		action_space_info.action = pose_action;
+		action_space_info.poseInActionSpace = identity_pose;
+		action_space_info.subactionPath = self->hand_paths[HAND_LEFT];
 
 		result = xrCreateActionSpace(self->session, &action_space_info, &pose_action_spaces[HAND_LEFT]);
 		if (!xr_result(self->instance, result, "failed to create left hand pose space"))
 			return;
 	}
 	{
-		XrActionSpaceCreateInfo action_space_info = {.type = XR_TYPE_ACTION_SPACE_CREATE_INFO,
-		                                             .next = NULL,
-		                                             .action = pose_action,
-		                                             .poseInActionSpace = identity_pose,
-		                                             .subactionPath = self->hand_paths[HAND_RIGHT]};
+		XrActionSpaceCreateInfo action_space_info;
+		action_space_info.type = XR_TYPE_ACTION_SPACE_CREATE_INFO;
+		action_space_info.next = NULL;
+		action_space_info.action = pose_action;
+		action_space_info.poseInActionSpace = identity_pose;
+		action_space_info.subactionPath = self->hand_paths[HAND_RIGHT];
 
 		result =
-		    xrCreateActionSpace(self->session, &action_space_info, &pose_action_spaces[HAND_RIGHT]);
+			xrCreateActionSpace(self->session, &action_space_info, &pose_action_spaces[HAND_RIGHT]);
 		if (!xr_result(self->instance, result, "failed to create left hand pose space"))
 			return;
 	}
 
 	XrSessionActionSetsAttachInfo actionset_attach_info = {
-	    .type = XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO,
-	    .next = NULL,
-	    .countActionSets = 1,
-	    .actionSets = &main_actionset};
+		.type = XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO,
+		.next = NULL,
+		.countActionSets = 1,
+		.actionSets = &main_actionset};
 	result = xrAttachSessionActionSets(self->session, &actionset_attach_info);
 	if (!xr_result(self->instance, result, "failed to attach action set"))
 		return;
@@ -1128,7 +1119,7 @@ main_loop(xr_example* self)
 			case XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING: {
 				printf("EVENT: reference space change pending!\n");
 				XrEventDataReferenceSpaceChangePending* event =
-				    (XrEventDataReferenceSpaceChangePending*)&runtime_event;
+					(XrEventDataReferenceSpaceChangePending*)&runtime_event;
 				(void)event;
 				// TODO: do something
 				break;
@@ -1136,7 +1127,7 @@ main_loop(xr_example* self)
 			case XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED: {
 				printf("EVENT: interaction profile changed!\n");
 				XrEventDataInteractionProfileChanged* event =
-				    (XrEventDataInteractionProfileChanged*)&runtime_event;
+					(XrEventDataInteractionProfileChanged*)&runtime_event;
 				(void)event;
 
 				XrInteractionProfileState state = {.type = XR_TYPE_INTERACTION_PROFILE_STATE};
@@ -1152,7 +1143,7 @@ main_loop(xr_example* self)
 					char profile_str[XR_MAX_PATH_LENGTH];
 					res = xrPathToString(self->instance, prof, XR_MAX_PATH_LENGTH, &strl, profile_str);
 					if (!xr_result(self->instance, res, "Failed to get interaction profile path str for %s",
-					               h_p_str(i)))
+								   h_p_str(i)))
 						continue;
 
 					printf("Event: Interaction profile changed for %s: %s\n", h_p_str(i), profile_str);
@@ -1164,7 +1155,7 @@ main_loop(xr_example* self)
 			case XR_TYPE_EVENT_DATA_VISIBILITY_MASK_CHANGED_KHR: {
 				printf("EVENT: visibility mask changed!!\n");
 				XrEventDataVisibilityMaskChangedKHR* event =
-				    (XrEventDataVisibilityMaskChangedKHR*)&runtime_event;
+					(XrEventDataVisibilityMaskChangedKHR*)&runtime_event;
 				(void)event;
 				// this event is from an extension
 				break;
@@ -1208,22 +1199,22 @@ main_loop(xr_example* self)
 
 			for (int i = 0; i < HAND_COUNT; i++) {
 
-				joint_locations[i] = (XrHandJointLocationsEXT){
-				    .type = XR_TYPE_HAND_JOINT_LOCATIONS_EXT,
-				    .jointCount = XR_HAND_JOINT_COUNT_EXT,
-				    .jointLocations = joints[i],
+				joint_locations[i] = XrHandJointLocationsEXT{
+					.type = XR_TYPE_HAND_JOINT_LOCATIONS_EXT,
+					.jointCount = XR_HAND_JOINT_COUNT_EXT,
+					.jointLocations = joints[i],
 				};
 
 				if (self->hand_tracking.trackers[i] == NULL)
 					continue;
 
 				XrHandJointsLocateInfoEXT locateInfo = {.type = XR_TYPE_HAND_JOINTS_LOCATE_INFO_EXT,
-				                                        .next = NULL,
-				                                        .baseSpace = self->play_space,
-				                                        .time = frameState.predictedDisplayTime};
+														.next = NULL,
+														.baseSpace = self->play_space,
+														.time = frameState.predictedDisplayTime};
 
 				result = self->hand_tracking.pfnLocateHandJointsEXT(self->hand_tracking.trackers[i],
-				                                                    &locateInfo, &joint_locations[i]);
+																	&locateInfo, &joint_locations[i]);
 				if (!xr_result(self->instance, result, "failed to locate hand %d joints!", i))
 					break;
 
@@ -1231,7 +1222,7 @@ main_loop(xr_example* self)
 				if (joint_locations[i].isActive) {
 				  printf("located hand %d joints", i);
 				  for (uint32_t j = 0; j < joint_locations[i].jointCount; j++) {
-				    printf("%f ", joint_locations[i].jointLocations[j].radius);
+					printf("%f ", joint_locations[i].jointLocations[j].radius);
 				  }
 				  printf("\n");
 				} else {
@@ -1243,13 +1234,13 @@ main_loop(xr_example* self)
 
 		// --- Create projection matrices and view matrices for each eye
 		XrViewLocateInfo view_locate_info = {.type = XR_TYPE_VIEW_LOCATE_INFO,
-		                                     .next = NULL,
-		                                     .viewConfigurationType =
-		                                         XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
-		                                     .displayTime = frameState.predictedDisplayTime,
-		                                     .space = self->play_space};
+											 .next = NULL,
+											 .viewConfigurationType =
+												 XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
+											 .displayTime = frameState.predictedDisplayTime,
+											 .space = self->play_space};
 
-		XrView views[self->view_count];
+		std::vector<XrView> views(self->view_count);
 		for (uint32_t i = 0; i < self->view_count; i++) {
 			views[i].type = XR_TYPE_VIEW;
 			views[i].next = NULL;
@@ -1258,18 +1249,18 @@ main_loop(xr_example* self)
 		XrViewState view_state = {.type = XR_TYPE_VIEW_STATE, .next = NULL};
 		uint32_t view_count;
 		result = xrLocateViews(self->session, &view_locate_info, &view_state, self->view_count,
-		                       &view_count, views);
+							   &view_count, views.data());
 		if (!xr_result(self->instance, result, "Could not locate views"))
 			break;
 
 		//! @todo Move this action processing to before xrWaitFrame, probably.
 		const XrActiveActionSet active_actionsets[] = {
-		    {.actionSet = main_actionset, .subactionPath = XR_NULL_PATH}};
+			{.actionSet = main_actionset, .subactionPath = XR_NULL_PATH}};
 
 		XrActionsSyncInfo actions_sync_info = {
-		    .type = XR_TYPE_ACTIONS_SYNC_INFO,
-		    .countActiveActionSets = sizeof(active_actionsets) / sizeof(active_actionsets[0]),
-		    .activeActionSets = active_actionsets,
+			.type = XR_TYPE_ACTIONS_SYNC_INFO,
+			.countActiveActionSets = sizeof(active_actionsets) / sizeof(active_actionsets[0]),
+			.activeActionSets = active_actionsets,
 		};
 		result = xrSyncActions(self->session, &actions_sync_info);
 		xr_result(self->instance, result, "failed to sync actions!");
@@ -1285,9 +1276,9 @@ main_loop(xr_example* self)
 			XrActionStatePose pose_state = {.type = XR_TYPE_ACTION_STATE_POSE, .next = NULL};
 			{
 				XrActionStateGetInfo get_info = {.type = XR_TYPE_ACTION_STATE_GET_INFO,
-				                                 .next = NULL,
-				                                 .action = pose_action,
-				                                 .subactionPath = self->hand_paths[i]};
+												 .next = NULL,
+												 .action = pose_action,
+												 .subactionPath = self->hand_paths[i]};
 				result = xrGetActionStatePose(self->session, &get_info, &pose_state);
 				xr_result(self->instance, result, "failed to get pose value!");
 			}
@@ -1297,11 +1288,11 @@ main_loop(xr_example* self)
 			hand_locations[i].next = NULL;
 
 			result = xrLocateSpace(pose_action_spaces[i], self->play_space,
-			                       frameState.predictedDisplayTime, &hand_locations[i]);
+								   frameState.predictedDisplayTime, &hand_locations[i]);
 			xr_result(self->instance, result, "failed to locate space %d!", i);
 			hand_locations_valid[i] =
-			    //(spaceLocation[i].locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 &&
-			    (hand_locations[i].locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0;
+				//(spaceLocation[i].locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 &&
+				(hand_locations[i].locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0;
 
 			/*
 			printf("Pose %d valid %d: %f %f %f %f, %f %f %f\n", i,
@@ -1316,9 +1307,9 @@ main_loop(xr_example* self)
 			grab_value[i].next = NULL;
 			{
 				XrActionStateGetInfo get_info = {.type = XR_TYPE_ACTION_STATE_GET_INFO,
-				                                 .next = NULL,
-				                                 .action = grab_action_float,
-				                                 .subactionPath = self->hand_paths[i]};
+												 .next = NULL,
+												 .action = grab_action_float,
+												 .subactionPath = self->hand_paths[i]};
 
 				result = xrGetActionStateFloat(self->session, &get_info, &grab_value[i]);
 				xr_result(self->instance, result, "failed to get grab value!");
@@ -1329,18 +1320,19 @@ main_loop(xr_example* self)
 			// grabValue[i].changedSinceLastSync);
 
 			if (grab_value[i].isActive && grab_value[i].currentState > 0.75) {
-				XrHapticVibration vibration = {.type = XR_TYPE_HAPTIC_VIBRATION,
-				                               .next = NULL,
-				                               .amplitude = 0.5,
-				                               .duration = XR_MIN_HAPTIC_DURATION,
-				                               .frequency = XR_FREQUENCY_UNSPECIFIED};
+				XrHapticVibration vibration;
+				vibration.type = XR_TYPE_HAPTIC_VIBRATION;
+				vibration.next = NULL;
+				vibration.amplitude = 0.5;
+				vibration.duration = XR_MIN_HAPTIC_DURATION;
+				vibration.frequency = XR_FREQUENCY_UNSPECIFIED;
 
 				XrHapticActionInfo haptic_action_info = {.type = XR_TYPE_HAPTIC_ACTION_INFO,
-				                                         .next = NULL,
-				                                         .action = haptic_action,
-				                                         .subactionPath = self->hand_paths[i]};
+														 .next = NULL,
+														 .action = haptic_action,
+														 .subactionPath = self->hand_paths[i]};
 				result = xrApplyHapticFeedback(self->session, &haptic_action_info,
-				                               (const XrHapticBaseHeader*)&vibration);
+											   (const XrHapticBaseHeader*)&vibration);
 				xr_result(self->instance, result, "failed to apply haptic feedback!");
 				// printf("Sent haptic output to hand %d\n", i);
 			}
@@ -1350,16 +1342,16 @@ main_loop(xr_example* self)
 			throttle_value[i].next = NULL;
 			{
 				XrActionStateGetInfo get_info = {.type = XR_TYPE_ACTION_STATE_GET_INFO,
-				                                 .next = NULL,
-				                                 .action = throttle_action_float,
-				                                 .subactionPath = self->hand_paths[i]};
+												 .next = NULL,
+												 .action = throttle_action_float,
+												 .subactionPath = self->hand_paths[i]};
 
 				result = xrGetActionStateFloat(self->session, &get_info, &throttle_value[i]);
 				xr_result(self->instance, result, "failed to get throttle value!");
 			}
 			if (throttle_value[i].isActive && throttle_value[i].currentState != 0) {
 				printf("Throttle value %d: changed %d: %f\n", i, throttle_value[i].changedSinceLastSync,
-				       throttle_value[i].currentState);
+					   throttle_value[i].currentState);
 			}
 		};
 
@@ -1375,21 +1367,21 @@ main_loop(xr_example* self)
 		for (uint32_t i = 0; i < self->view_count; i++) {
 			XrMatrix4x4f projection_matrix;
 			XrMatrix4x4f_CreateProjectionFov(&projection_matrix, GRAPHICS_OPENGL, views[i].fov,
-			                                 self->near_z, self->far_z);
+											 self->near_z, self->far_z);
 
 			XrMatrix4x4f view_matrix;
 			XrMatrix4x4f_CreateViewMatrix(&view_matrix, &views[i].pose.position,
-			                              &views[i].pose.orientation);
+										  &views[i].pose.orientation);
 
 			XrSwapchainImageAcquireInfo acquire_info = {.type = XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO,
-			                                            .next = NULL};
+														.next = NULL};
 			uint32_t acquired_index;
 			result = xrAcquireSwapchainImage(self->swapchains[i], &acquire_info, &acquired_index);
 			if (!xr_result(self->instance, result, "failed to acquire swapchain image!"))
 				break;
 
 			XrSwapchainImageWaitInfo wait_info = {
-			    .type = XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO, .next = NULL, .timeout = 1000};
+				.type = XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO, .next = NULL, .timeout = 1000};
 			result = xrWaitSwapchainImage(self->swapchains[i], &wait_info);
 			if (!xr_result(self->instance, result, "failed to wait for swapchain image!"))
 				break;
@@ -1397,14 +1389,14 @@ main_loop(xr_example* self)
 			uint32_t depth_acquired_index = UINT32_MAX;
 			if (self->depth_swapchain_format != -1) {
 				XrSwapchainImageAcquireInfo depth_acquire_info = {
-				    .type = XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO, .next = NULL};
+					.type = XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO, .next = NULL};
 				result = xrAcquireSwapchainImage(self->depth_swapchains[i], &depth_acquire_info,
-				                                 &depth_acquired_index);
+												 &depth_acquired_index);
 				if (!xr_result(self->instance, result, "failed to acquire swapchain image!"))
 					break;
 
 				XrSwapchainImageWaitInfo depth_wait_info = {
-				    .type = XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO, .next = NULL, .timeout = 1000};
+					.type = XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO, .next = NULL, .timeout = 1000};
 				result = xrWaitSwapchainImage(self->depth_swapchains[i], &depth_wait_info);
 				if (!xr_result(self->instance, result, "failed to wait for swapchain image!"))
 					break;
@@ -1414,24 +1406,24 @@ main_loop(xr_example* self)
 			self->projection_views[i].fov = views[i].fov;
 
 			GLuint depth_image = self->depth_swapchain_format != -1
-			                         ? self->depth_images[i][depth_acquired_index].image
-			                         : UINT32_MAX;
+									 ? self->depth_images[i][depth_acquired_index].image
+									 : UINT32_MAX;
 
 			render_frame(self->viewconfig_views[i].recommendedImageRectWidth,
-			             self->viewconfig_views[i].recommendedImageRectHeight, projection_matrix,
-			             view_matrix, hand_locations, hand_locations_valid, joint_locations,
-			             self->framebuffers[i][acquired_index], depth_image,
-			             self->images[i][acquired_index], i, frameState.predictedDisplayTime);
+						 self->viewconfig_views[i].recommendedImageRectHeight, projection_matrix,
+						 view_matrix, hand_locations, hand_locations_valid, joint_locations,
+						 self->framebuffers[i][acquired_index], depth_image,
+						 self->images[i][acquired_index], i, frameState.predictedDisplayTime);
 			glFinish();
 			XrSwapchainImageReleaseInfo release_info = {.type = XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO,
-			                                            .next = NULL};
+														.next = NULL};
 			result = xrReleaseSwapchainImage(self->swapchains[i], &release_info);
 			if (!xr_result(self->instance, result, "failed to release swapchain image!"))
 				break;
 
 			if (self->depth_swapchain_format != -1) {
 				XrSwapchainImageReleaseInfo depth_release_info = {
-				    .type = XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO, .next = NULL};
+					.type = XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO, .next = NULL};
 				result = xrReleaseSwapchainImage(self->depth_swapchains[i], &depth_release_info);
 				if (!xr_result(self->instance, result, "failed to release swapchain image!"))
 					break;
@@ -1440,23 +1432,23 @@ main_loop(xr_example* self)
 
 
 		XrSwapchainImageAcquireInfo acquire_info = {.type = XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO,
-		                                            .next = NULL};
+													.next = NULL};
 		uint32_t acquired_index;
 		result = xrAcquireSwapchainImage(self->quad_swapchain, &acquire_info, &acquired_index);
 		if (!xr_result(self->instance, result, "failed to acquire swapchain image!"))
 			break;
 
 		XrSwapchainImageWaitInfo wait_info = {
-		    .type = XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO, .next = NULL, .timeout = 1000};
+			.type = XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO, .next = NULL, .timeout = 1000};
 		result = xrWaitSwapchainImage(self->quad_swapchain, &wait_info);
 		if (!xr_result(self->instance, result, "failed to wait for swapchain image!"))
 			break;
 
 		render_quad(self->quad_pixel_width, self->quad_pixel_height, self->swapchain_format,
-		            self->quad_images[acquired_index], frameState.predictedDisplayTime);
+					self->quad_images[acquired_index], frameState.predictedDisplayTime);
 
 		XrSwapchainImageReleaseInfo release_info = {.type = XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO,
-		                                            .next = NULL};
+													.next = NULL};
 		result = xrReleaseSwapchainImage(self->quad_swapchain, &release_info);
 		if (!xr_result(self->instance, result, "failed to release swapchain image!"))
 			break;
@@ -1464,24 +1456,24 @@ main_loop(xr_example* self)
 
 		if (self->cylinder.supported) {
 			XrSwapchainImageAcquireInfo acquire_info = {.type = XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO,
-			                                            .next = NULL};
+														.next = NULL};
 			uint32_t acquired_index;
 			result = xrAcquireSwapchainImage(self->cylinder.swapchain, &acquire_info, &acquired_index);
 			if (!xr_result(self->instance, result, "failed to acquire swapchain image!"))
 				break;
 
 			XrSwapchainImageWaitInfo wait_info = {
-			    .type = XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO, .next = NULL, .timeout = 1000};
+				.type = XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO, .next = NULL, .timeout = 1000};
 			result = xrWaitSwapchainImage(self->cylinder.swapchain, &wait_info);
 			if (!xr_result(self->instance, result, "failed to wait for swapchain image!"))
 				break;
 
 			render_quad(self->cylinder.swapchain_width, self->cylinder.swapchain_height,
-			            self->cylinder.format, self->cylinder.images[acquired_index],
-			            frameState.predictedDisplayTime);
+						self->cylinder.format, self->cylinder.images[acquired_index],
+						frameState.predictedDisplayTime);
 
 			XrSwapchainImageReleaseInfo release_info = {.type = XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO,
-			                                            .next = NULL};
+														.next = NULL};
 			result = xrReleaseSwapchainImage(self->cylinder.swapchain, &release_info);
 			if (!xr_result(self->instance, result, "failed to release swapchain image!"))
 				break;
@@ -1491,74 +1483,77 @@ main_loop(xr_example* self)
 
 		// projectionLayers struct reused for every frame
 		XrCompositionLayerProjection projection_layer = {
-		    .type = XR_TYPE_COMPOSITION_LAYER_PROJECTION,
-		    .next = NULL,
-		    .layerFlags = 0,
-		    .space = self->play_space,
-		    .viewCount = self->view_count,
-		    .views = self->projection_views,
+			.type = XR_TYPE_COMPOSITION_LAYER_PROJECTION,
+			.next = NULL,
+			.layerFlags = 0,
+			.space = self->play_space,
+			.viewCount = self->view_count,
+			.views = self->projection_views,
 		};
 
 		float aspect = (float)self->quad_pixel_width / (float)self->quad_pixel_height;
 		float quad_width = 1.f;
-		XrCompositionLayerQuad quad_layer = {
-		    .type = XR_TYPE_COMPOSITION_LAYER_QUAD,
-		    .next = NULL,
-		    .layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT,
-		    .space = self->play_space,
-		    .eyeVisibility = XR_EYE_VISIBILITY_BOTH,
-		    .pose = {.orientation = {.x = 0.f, .y = 0.f, .z = 0.f, .w = 1.f},
-		             .position = {.x = 1.5f, .y = .7f, .z = -1.5f}},
-		    .size = {.width = quad_width, .height = quad_width / aspect},
-		    .subImage = {
-		        .swapchain = self->quad_swapchain,
-		        .imageRect = {
-		            .offset = {.x = 0, .y = 0},
-		            .extent = {.width = self->quad_pixel_width, .height = self->quad_pixel_height},
-		        }}};
+		XrCompositionLayerQuad quad_layer;
+
+		quad_layer.type = XR_TYPE_COMPOSITION_LAYER_QUAD,
+		quad_layer.next = NULL,
+		quad_layer.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT,
+		quad_layer.space = self->play_space,
+		quad_layer.eyeVisibility = XR_EYE_VISIBILITY_BOTH,
+		quad_layer.pose = {.orientation = {.x = 0.f, .y = 0.f, .z = 0.f, .w = 1.f},
+					 .position = {.x = 1.5f, .y = .7f, .z = -1.5f}},
+		quad_layer.size = {.width = quad_width, .height = quad_width / aspect},
+		quad_layer.subImage = {
+				.swapchain = self->quad_swapchain,
+				.imageRect = {
+					.offset = {.x = 0, .y = 0},
+		                           .extent = {.width = (int32_t)self->quad_pixel_width,
+		                                      .height = (int32_t)self->quad_pixel_height},
+				}};
 
 
 		float cylinder_aspect =
-		    (float)self->cylinder.swapchain_width / (float)self->cylinder.swapchain_height;
+			(float)self->cylinder.swapchain_width / (float)self->cylinder.swapchain_height;
 
 		float threesixty = M_PI * 2 - 0.0001; /* TODO: spec issue range [0, 2π)*/
 
 		float angleratio = 1 + (loop_count % 1000) / 50.;
 		XrCompositionLayerCylinderKHR cylinder_layer = {
-		    .type = XR_TYPE_COMPOSITION_LAYER_CYLINDER_KHR,
-		    .next = NULL,
-		    .layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT,
-		    .space = self->play_space,
-		    .eyeVisibility = XR_EYE_VISIBILITY_BOTH,
-		    .subImage = {.swapchain = self->cylinder.swapchain,
-		                 .imageRect = {.offset = {.x = 0, .y = 0},
-		                               .extent = {.width = self->cylinder.swapchain_width,
-		                                          .height = self->cylinder.swapchain_height}}},
-		    .pose = {.orientation = {.x = 0.f, .y = 0.f, .z = 0.f, .w = 1.f},
-		             .position = {.x = 1.5f, .y = 0.f, .z = -1.5f}},
-		    .radius = 0.5,
-		    .centralAngle = threesixty / 3,
-		    .aspectRatio = cylinder_aspect};
+			.type = XR_TYPE_COMPOSITION_LAYER_CYLINDER_KHR,
+			.next = NULL,
+			.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT,
+			.space = self->play_space,
+			.eyeVisibility = XR_EYE_VISIBILITY_BOTH,
+			.subImage = {.swapchain = self->cylinder.swapchain,
+						 .imageRect = {.offset = {.x = 0, .y = 0},
+		                               .extent = {.width = (int32_t)self->cylinder.swapchain_width,
+		                                          .height = (int32_t)self->cylinder.swapchain_height}}},
+			.pose = {.orientation = {.x = 0.f, .y = 0.f, .z = 0.f, .w = 1.f},
+					 .position = {.x = 1.5f, .y = 0.f, .z = -1.5f}},
+			.radius = 0.5,
+			.centralAngle = threesixty / 3,
+			.aspectRatio = cylinder_aspect};
 
 		int submitted_layer_count = 1;
 		const XrCompositionLayerBaseHeader* submittedLayers[3] = {
-		    (const XrCompositionLayerBaseHeader* const) & projection_layer};
+			(const XrCompositionLayerBaseHeader* const) & projection_layer};
 
 		if (true) {
 			submittedLayers[submitted_layer_count++] =
-			    (const XrCompositionLayerBaseHeader* const) & quad_layer;
+				(const XrCompositionLayerBaseHeader* const) & quad_layer;
 		}
 		if (self->cylinder.supported) {
 			submittedLayers[submitted_layer_count++] =
-			    (const XrCompositionLayerBaseHeader* const) & cylinder_layer;
+				(const XrCompositionLayerBaseHeader* const) & cylinder_layer;
 		};
 
-		XrFrameEndInfo frameEndInfo = {.type = XR_TYPE_FRAME_END_INFO,
-		                               .displayTime = frameState.predictedDisplayTime,
-		                               .layerCount = submitted_layer_count,
-		                               .layers = submittedLayers,
-		                               .environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE,
-		                               .next = NULL};
+		XrFrameEndInfo frameEndInfo;
+		frameEndInfo.type = XR_TYPE_FRAME_END_INFO;
+		frameEndInfo.displayTime = frameState.predictedDisplayTime;
+		frameEndInfo.layerCount = submitted_layer_count;
+		frameEndInfo.layers = submittedLayers;
+		frameEndInfo.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+		frameEndInfo.next = NULL;
 		result = xrEndFrame(self->session, &frameEndInfo);
 		if (!xr_result(self->instance, result, "failed to end frame!"))
 			break;
@@ -1569,7 +1564,7 @@ void
 sdl_handle_events(SDL_Event event, bool* request_exit)
 {
 	if (event.type == SDL_QUIT ||
-	    (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) {
+		(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) {
 		*request_exit = true;
 	}
 }
@@ -1584,7 +1579,7 @@ cleanup(xr_example* self)
 	if (self->hand_tracking.system_supported) {
 		PFN_xrDestroyHandTrackerEXT pfnDestroyHandTrackerEXT = NULL;
 		result = xrGetInstanceProcAddr(self->instance, "xrDestroyHandTrackerEXT",
-		                               (PFN_xrVoidFunction*)&pfnDestroyHandTrackerEXT);
+									   (PFN_xrVoidFunction*)&pfnDestroyHandTrackerEXT);
 
 		xr_result(self->instance, result, "Failed to get xrDestroyHandTrackerEXT function!");
 
@@ -1635,7 +1630,7 @@ int
 main()
 {
 	xr_example self = {
-	    .instance = XR_NULL_HANDLE,
+		.instance = XR_NULL_HANDLE,
 	};
 	int ret = init_openxr(&self);
 	if (ret != 0)
