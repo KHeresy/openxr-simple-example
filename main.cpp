@@ -77,15 +77,12 @@ public:
 	XrGraphicsBindingOpenGLWin32KHR graphics_binding_gl;
 
 	int64_t swapchain_format;
-	// length of the swapchain per view. Usually all the same, but not required.
-	std::vector<uint32_t> swapchain_lengths;
 	// one array of images per view.
 	std::vector<std::vector<XrSwapchainImageOpenGLKHR>> images;
 	// one swapchain per view. Using only one and rendering l/r to the same image is also possible.
 	std::vector<XrSwapchain> swapchains;
 
 	int64_t depth_swapchain_format;
-	std::vector<uint32_t> depth_swapchain_lengths;
 	std::vector<std::vector<XrSwapchainImageOpenGLKHR>> depth_images;
 	std::vector<XrSwapchain> depth_swapchains;
 
@@ -303,22 +300,14 @@ int init_openxr(XrExample* self)
 
 	printf("Runtime supports %d extensions\n", ext_count);
 
-	std::vector<XrExtensionProperties> extensionProperties(ext_count);
-	for (uint16_t i = 0; i < ext_count; i++) {
-		// we usually have to fill in the type (for validation) and set
-		// next to NULL (or a pointer to an extension specific struct)
-		extensionProperties[i].type = XR_TYPE_EXTENSION_PROPERTIES;
-		extensionProperties[i].next = NULL;
-	}
-
+	std::vector<XrExtensionProperties> extensionProperties(ext_count, { XR_TYPE_EXTENSION_PROPERTIES, nullptr });
 	result = xrEnumerateInstanceExtensionProperties(NULL, ext_count, &ext_count, extensionProperties.data());
 	if (!xr_result(NULL, result, "Failed to enumerate extension properties"))
 		return 1;
 
 	bool opengl_ext = false;
 	for (uint32_t i = 0; i < ext_count; i++) {
-		printf("\t%s v%d\n", extensionProperties[i].extensionName,
-			   extensionProperties[i].extensionVersion);
+		printf("\t%s v%d\n", extensionProperties[i].extensionName, extensionProperties[i].extensionVersion);
 		if (strcmp(XR_KHR_OPENGL_ENABLE_EXTENSION_NAME, extensionProperties[i].extensionName) == 0) {
 			opengl_ext = true;
 		}
@@ -326,13 +315,11 @@ int init_openxr(XrExample* self)
 			self->hand_tracking.supported = true;
 		}
 
-		if (strcmp(XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME,
-				   extensionProperties[i].extensionName) == 0) {
+		if (strcmp(XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME, extensionProperties[i].extensionName) == 0) {
 			self->cylinder.supported = true;
 		}
 
-		if (strcmp(XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME,
-				   extensionProperties[i].extensionName) == 0) {
+		if (strcmp(XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME, extensionProperties[i].extensionName) == 0) {
 			self->depth.supported = true;
 		}
 	}
@@ -376,8 +363,7 @@ int init_openxr(XrExample* self)
 	    enabled_ext_count,
 		enabled_exts
 	};
-	strncpy(instance_create_info.applicationInfo.applicationName, "OpenXR OpenGL Example",
-			XR_MAX_APPLICATION_NAME_SIZE);
+	strncpy(instance_create_info.applicationInfo.applicationName, "OpenXR OpenGL Example", XR_MAX_APPLICATION_NAME_SIZE);
 	strncpy(instance_create_info.applicationInfo.engineName, "Custom", XR_MAX_ENGINE_NAME_SIZE);
 
 	result = xrCreateInstance(&instance_create_info, &self->instance);
@@ -388,8 +374,9 @@ int init_openxr(XrExample* self)
 	get_instance_properties(self->instance);
 
 	// --- Create XrSystem
-	XrSystemGetInfo system_get_info = {.type = XR_TYPE_SYSTEM_GET_INFO, .next = NULL,
-									   .formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY };
+	XrSystemGetInfo system_get_info = {	.type = XR_TYPE_SYSTEM_GET_INFO, 
+										.next = NULL,
+										.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY };
 
 	result = xrGetSystem(self->instance, &system_get_info, &self->system_id);
 	if (!xr_result(self->instance, result, "Failed to get system for HMD form factor."))
@@ -430,32 +417,24 @@ int init_openxr(XrExample* self)
 	XrViewConfigurationType view_type = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
 
 	uint32_t view_count = 0;
-	result = xrEnumerateViewConfigurationViews(self->instance, self->system_id, view_type, 0,
-											   &view_count, NULL);
+	result = xrEnumerateViewConfigurationViews(self->instance, self->system_id, view_type, 0, &view_count, NULL);
 	if (!xr_result(self->instance, result, "Failed to get view configuration view count!"))
 		return 1;
 
-	self->viewconfig_views.resize(view_count);
-	for (uint32_t i = 0; i < self->viewconfig_views.size(); i++) {
-		self->viewconfig_views[i].type = XR_TYPE_VIEW_CONFIGURATION_VIEW;
-		self->viewconfig_views[i].next = NULL;
-	}
+	self->viewconfig_views.resize(view_count, { XR_TYPE_VIEW_CONFIGURATION_VIEW, nullptr });
 
-	result = xrEnumerateViewConfigurationViews(self->instance, self->system_id, view_type,
-		view_count, &view_count, self->viewconfig_views.data());
+	result = xrEnumerateViewConfigurationViews(self->instance, self->system_id, view_type, view_count, &view_count, self->viewconfig_views.data());
 	if (!xr_result(self->instance, result, "Failed to enumerate view configuration views!"))
 		return 1;
 	print_viewconfig_view_info(self);
 
 
 	// OpenXR requires checking graphics requirements before creating a session.
-	XrGraphicsRequirementsOpenGLKHR opengl_reqs = {.type = XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR,
-												   .next = NULL};
+	XrGraphicsRequirementsOpenGLKHR opengl_reqs = {.type = XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR, .next = NULL};
 
 	PFN_xrGetOpenGLGraphicsRequirementsKHR pfnGetOpenGLGraphicsRequirementsKHR = NULL;
 	{
-		result = xrGetInstanceProcAddr(self->instance, "xrGetOpenGLGraphicsRequirementsKHR",
-									   (PFN_xrVoidFunction*)&pfnGetOpenGLGraphicsRequirementsKHR);
+		result = xrGetInstanceProcAddr(self->instance, "xrGetOpenGLGraphicsRequirementsKHR", (PFN_xrVoidFunction*)&pfnGetOpenGLGraphicsRequirementsKHR);
 		if (!xr_result(self->instance, result, "Failed to get OpenGL graphics requirements function!"))
 			return 1;
 	}
@@ -470,9 +449,7 @@ int init_openxr(XrExample* self)
 
 
 	// --- Create session
-	self->graphics_binding_gl = XrGraphicsBindingOpenGLWin32KHR{
-	    .type = XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR,
-	};
+	self->graphics_binding_gl = XrGraphicsBindingOpenGLWin32KHR{ .type = XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR, };
 
 	// create SDL window the size of the left eye & fill GL graphics binding info
 	if (!init_sdl_window(self->graphics_binding_gl.hDC, self->graphics_binding_gl.hGLRC,
@@ -576,8 +553,7 @@ int init_openxr(XrExample* self)
 
 	printf("Runtime supports %d swapchain formats\n", swapchain_format_count);
 	std::vector<int64_t> swapchain_formats(swapchain_format_count);
-	result = xrEnumerateSwapchainFormats(self->session, swapchain_format_count,
-										 &swapchain_format_count, swapchain_formats.data());
+	result = xrEnumerateSwapchainFormats(self->session, swapchain_format_count, &swapchain_format_count, swapchain_formats.data());
 	if (!xr_result(self->instance, result, "Failed to enumerate swapchain formats"))
 		return 1;
 
@@ -618,7 +594,6 @@ int init_openxr(XrExample* self)
 	 * swapchain.
 	 */
 	self->swapchains.resize(view_count);
-	self->swapchain_lengths.resize(view_count);
 	self->images.resize(view_count);
 	for (uint32_t i = 0; i < view_count; i++) {
 		XrSwapchainCreateInfo swapchain_create_info;
@@ -638,19 +613,14 @@ int init_openxr(XrExample* self)
 		if (!xr_result(self->instance, result, "Failed to create swapchain %d!", i))
 			return 1;
 
-		result = xrEnumerateSwapchainImages(self->swapchains[i], 0, &self->swapchain_lengths[i], NULL);
+		uint32_t swapchain_length;
+		result = xrEnumerateSwapchainImages(self->swapchains[i], 0, &swapchain_length, nullptr);
 		if (!xr_result(self->instance, result, "Failed to enumerate swapchains"))
 			return 1;
 
 		// these are wrappers for the actual OpenGL texture id
-		self->images[i].resize( self->swapchain_lengths[i]);
-		for (uint32_t j = 0; j < self->swapchain_lengths[i]; j++) {
-			self->images[i][j].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
-			self->images[i][j].next = NULL;
-		}
-		result = xrEnumerateSwapchainImages(self->swapchains[i], self->swapchain_lengths[i],
-											&self->swapchain_lengths[i],
-											(XrSwapchainImageBaseHeader*)self->images[i].data());
+		self->images[i].resize(swapchain_length, { XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR , nullptr});
+		result = xrEnumerateSwapchainImages(self->swapchains[i], swapchain_length, &swapchain_length, (XrSwapchainImageBaseHeader*)self->images[i].data());
 		if (!xr_result(self->instance, result, "Failed to enumerate swapchain images"))
 			return 1;
 	}
@@ -662,8 +632,8 @@ int init_openxr(XrExample* self)
 	 */
 	self->framebuffers.resize(view_count);
 	for (uint32_t i = 0; i < view_count; i++) {
-		self->framebuffers[i].resize(self->swapchain_lengths[i]);
-		glGenFramebuffers(self->swapchain_lengths[i], self->framebuffers[i].data());
+		self->framebuffers[i].resize(self->images[i].size());
+		glGenFramebuffers(self->framebuffers[i].size(), self->framebuffers[i].data());
 	}
 
 	if (self->depth_swapchain_format == -1) {
@@ -673,7 +643,6 @@ int init_openxr(XrExample* self)
 
 	if (self->depth_swapchain_format != -1) {
 		self->depth_swapchains.resize(view_count);
-		self->depth_swapchain_lengths.resize(view_count);
 		self->depth_images.resize( view_count);
 		for (uint32_t i = 0; i < view_count; i++) {
 			XrSwapchainCreateInfo swapchain_create_info;
@@ -693,20 +662,14 @@ int init_openxr(XrExample* self)
 			if (!xr_result(self->instance, result, "Failed to create swapchain %d!", i))
 				return 1;
 
-			result = xrEnumerateSwapchainImages(self->depth_swapchains[i], 0,
-												&self->depth_swapchain_lengths[i], NULL);
+			uint32_t depth_swapchain_length;
+			result = xrEnumerateSwapchainImages(self->depth_swapchains[i], 0, &depth_swapchain_length, nullptr);
 			if (!xr_result(self->instance, result, "Failed to enumerate swapchains"))
 				return 1;
 
 			// these are wrappers for the actual OpenGL texture id
-			self->depth_images[i].resize(self->depth_swapchain_lengths[i]);
-			for (uint32_t j = 0; j < self->depth_swapchain_lengths[i]; j++) {
-				self->depth_images[i][j].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
-				self->depth_images[i][j].next = NULL;
-			}
-			result = xrEnumerateSwapchainImages(
-				self->depth_swapchains[i], self->depth_swapchain_lengths[i],
-				&self->depth_swapchain_lengths[i], (XrSwapchainImageBaseHeader*)self->depth_images[i].data());
+			self->depth_images[i].resize(depth_swapchain_length, { XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR , nullptr});
+			result = xrEnumerateSwapchainImages( self->depth_swapchains[i], depth_swapchain_length, &depth_swapchain_length, (XrSwapchainImageBaseHeader*)self->depth_images[i].data());
 			if (!xr_result(self->instance, result, "Failed to enumerate swapchain images"))
 				return 1;
 		}
@@ -737,11 +700,7 @@ int init_openxr(XrExample* self)
 			return 1;
 
 		// these are wrappers for the actual OpenGL texture id
-		self->quad_images.resize(self->quad_swapchain_length);
-		for (uint32_t j = 0; j < self->quad_swapchain_length; j++) {
-			self->quad_images[j].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
-			self->quad_images[j].next = NULL;
-		}
+		self->quad_images.resize(self->quad_swapchain_length, { XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR , nullptr});
 		result = xrEnumerateSwapchainImages(self->quad_swapchain, self->quad_swapchain_length,
 											&self->quad_swapchain_length,
 											(XrSwapchainImageBaseHeader*)self->quad_images.data());
@@ -775,11 +734,7 @@ int init_openxr(XrExample* self)
 			return 1;
 
 		// these are wrappers for the actual OpenGL texture id
-		self->cylinder.images.resize(self->cylinder.swapchain_length);
-		for (uint32_t j = 0; j < self->cylinder.swapchain_length; j++) {
-			self->cylinder.images[j].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
-			self->cylinder.images[j].next = NULL;
-		}
+		self->cylinder.images.resize(self->cylinder.swapchain_length, { XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR , nullptr});
 		result = xrEnumerateSwapchainImages(self->cylinder.swapchain, self->cylinder.swapchain_length,
 											&self->cylinder.swapchain_length,
 											(XrSwapchainImageBaseHeader*)self->cylinder.images.data());
@@ -793,12 +748,9 @@ int init_openxr(XrExample* self)
 
 	// A stereo view config implies two views, but our code is set up for a dynamic amount of views.
 	// So we need to allocate a bunch of memory for data structures dynamically.
-	self->views.resize(view_count);
+	self->views.resize(view_count, { XR_TYPE_VIEW , nullptr});
 	self->projection_views.resize(view_count);
 	for (uint32_t i = 0; i < view_count; i++) {
-		self->views[i].type = XR_TYPE_VIEW;
-		self->views[i].next = NULL;
-
 		self->projection_views[i].type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW;
 		self->projection_views[i].next = NULL;
 
@@ -806,10 +758,8 @@ int init_openxr(XrExample* self)
 		self->projection_views[i].subImage.imageArrayIndex = 0;
 		self->projection_views[i].subImage.imageRect.offset.x = 0;
 		self->projection_views[i].subImage.imageRect.offset.y = 0;
-		self->projection_views[i].subImage.imageRect.extent.width =
-			self->viewconfig_views[i].recommendedImageRectWidth;
-		self->projection_views[i].subImage.imageRect.extent.height =
-			self->viewconfig_views[i].recommendedImageRectHeight;
+		self->projection_views[i].subImage.imageRect.extent.width = self->viewconfig_views[i].recommendedImageRectWidth;
+		self->projection_views[i].subImage.imageRect.extent.height = self->viewconfig_views[i].recommendedImageRectHeight;
 
 		// projection_views[i].pose (and fov) have to be filled every frame in frame loop
 	};
@@ -830,10 +780,8 @@ int init_openxr(XrExample* self)
 			self->depth.infos[i].subImage.imageArrayIndex = 0;
 			self->depth.infos[i].subImage.imageRect.offset.x = 0;
 			self->depth.infos[i].subImage.imageRect.offset.y = 0;
-			self->depth.infos[i].subImage.imageRect.extent.width =
-				self->viewconfig_views[i].recommendedImageRectWidth;
-			self->depth.infos[i].subImage.imageRect.extent.height =
-				self->viewconfig_views[i].recommendedImageRectHeight;
+			self->depth.infos[i].subImage.imageRect.extent.width = self->viewconfig_views[i].recommendedImageRectWidth;
+			self->depth.infos[i].subImage.imageRect.extent.height = self->viewconfig_views[i].recommendedImageRectHeight;
 
 			self->projection_views[i].next = &self->depth.infos[i];
 		};
@@ -1573,8 +1521,8 @@ void cleanup(XrExample* self)
 
 	xrDestroySession(self->session);
 
-	for (uint32_t i = 0; i < self->viewconfig_views.size(); i++) {
-		glDeleteFramebuffers(self->swapchain_lengths[i], self->framebuffers[i].data());
+	for(auto& frame_buffer: self->framebuffers)	{
+		glDeleteFramebuffers(frame_buffer.size(), frame_buffer.data());
 	}
 	xrDestroyInstance(self->instance);
 
