@@ -6,14 +6,15 @@
  * @author Christoph Haag <christoph.haag@collabora.com>
  */
 
-
-#include <stdio.h>
-#include <stdbool.h>
-
+// STD Header
+#include <iostream>
+#include <array>
 #include <vector>
+#include <string>
 
 #include "glimpl.h" // factored out rendering of a simple scene
 
+// OpenXR Header and defination
 #define XR_USE_GRAPHICS_API_OPENGL
 #define XR_USE_PLATFORM_WIN32
 #include "openxr/openxr.h"
@@ -35,8 +36,7 @@ enum OPENXR_HANDS
 	HAND_COUNT
 };
 
-char*
-h_str(int hand)
+std::string h_str(int hand)
 {
 	if (hand == HAND_LEFT)
 		return "left";
@@ -46,8 +46,7 @@ h_str(int hand)
 		return "invalid";
 }
 
-char*
-h_p_str(int hand)
+std::string h_p_str(int hand)
 {
 	if (hand == HAND_LEFT)
 		return "/user/hand/left";
@@ -57,45 +56,44 @@ h_p_str(int hand)
 		return "invalid";
 }
 
-typedef struct xr_example
+class XrExample
 {
-	// every OpenXR app that displays something needs at least an instance and a
-	// session
-	XrInstance instance;
-	XrSession session;
-	XrSystemId system_id;
-	XrSessionState state;
+public:
+	// every OpenXR app that displays something needs at least an instance and a session
+	XrInstance		instance = XR_NULL_HANDLE;
+	XrSession		session;
+	XrSystemId		system_id;
+	XrSessionState	state;
 
 	// Play space is usually local (head is origin, seated) or stage (room scale)
-	XrSpace play_space;
+	XrSpace			play_space;
 
 	// Each physical Display/Eye is described by a view
-	uint32_t view_count;
-	XrViewConfigurationView* viewconfig_views;
-	XrCompositionLayerProjectionView* projection_views;
-	XrView* views;
+	std::vector<XrViewConfigurationView>			viewconfig_views;
+	std::vector<XrCompositionLayerProjectionView>	projection_views;
+	std::vector<XrView> views;
 
 	// The runtime interacts with the OpenGL images (textures) via a Swapchain.
 	XrGraphicsBindingOpenGLWin32KHR graphics_binding_gl;
 
 	int64_t swapchain_format;
 	// length of the swapchain per view. Usually all the same, but not required.
-	uint32_t* swapchain_lengths;
+	std::vector<uint32_t> swapchain_lengths;
 	// one array of images per view.
-	XrSwapchainImageOpenGLKHR** images;
+	std::vector<std::vector<XrSwapchainImageOpenGLKHR>> images;
 	// one swapchain per view. Using only one and rendering l/r to the same image is also possible.
-	XrSwapchain* swapchains;
+	std::vector<XrSwapchain> swapchains;
 
 	int64_t depth_swapchain_format;
-	uint32_t* depth_swapchain_lengths;
-	XrSwapchainImageOpenGLKHR** depth_images;
-	XrSwapchain* depth_swapchains;
+	std::vector<uint32_t> depth_swapchain_lengths;
+	std::vector<std::vector<XrSwapchainImageOpenGLKHR>> depth_images;
+	std::vector<XrSwapchain> depth_swapchains;
 
 	// quad layers are placed into world space, no need to render them per eye
 	int64_t quad_swapchain_format;
 	uint32_t quad_pixel_width, quad_pixel_height;
 	uint32_t quad_swapchain_length;
-	XrSwapchainImageOpenGLKHR* quad_images;
+	std::vector<XrSwapchainImageOpenGLKHR> quad_images;
 	XrSwapchain quad_swapchain;
 
 	float near_z;
@@ -105,7 +103,7 @@ typedef struct xr_example
 	struct
 	{
 		bool supported;
-		XrCompositionLayerDepthInfoKHR* infos;
+		std::vector<XrCompositionLayerDepthInfoKHR> infos;
 	} depth;
 
 	// cylinder layer extension data
@@ -115,14 +113,14 @@ typedef struct xr_example
 		int64_t format;
 		uint32_t swapchain_width, swapchain_height;
 		uint32_t swapchain_length;
-		XrSwapchainImageOpenGLKHR* images;
+		std::vector<XrSwapchainImageOpenGLKHR> images;
 		XrSwapchain swapchain;
 	} cylinder;
 
 	// To render into a texture we need a framebuffer (one per texture to make it easy)
-	GLuint** framebuffers;
+	std::vector<std::vector<GLuint>> framebuffers;
 
-	XrPath hand_paths[HAND_COUNT];
+	std::array<XrPath, HAND_COUNT> hand_paths;
 
 	// hand tracking extension data
 	struct
@@ -131,12 +129,11 @@ typedef struct xr_example
 		// whether the current VR system in use has hand tracking
 		bool system_supported;
 		PFN_xrLocateHandJointsEXT pfnLocateHandJointsEXT;
-		XrHandTrackerEXT trackers[HAND_COUNT];
+		std::array<XrHandTrackerEXT, HAND_COUNT> trackers;
 	} hand_tracking;
 } xr_example;
 
-bool
-xr_result(XrInstance instance, XrResult result, const char* format, ...)
+bool xr_result(XrInstance instance, XrResult result, const char* format, ...)
 {
 	if (XR_SUCCEEDED(result))
 		return true;
@@ -154,16 +151,14 @@ xr_result(XrInstance instance, XrResult result, const char* format, ...)
 	vprintf(formatRes, args);
 	va_end(args);
 
-	free(formatRes);
+	delete [] formatRes;
 	return false;
 }
 
-void
-sdl_handle_events(SDL_Event event, bool* running);
+void sdl_handle_events(SDL_Event event, bool* running);
 
 // some optional OpenXR calls demonstrated in functions to clutter the main app less
-void
-get_instance_properties(XrInstance instance)
+void get_instance_properties(XrInstance instance)
 {
 	XrResult result;
 	XrInstanceProperties instance_props = {
@@ -175,69 +170,60 @@ get_instance_properties(XrInstance instance)
 	if (!xr_result(NULL, result, "Failed to get instance info"))
 		return;
 
-	printf("Runtime Name: %s\n", instance_props.runtimeName);
-	printf("Runtime Version: %d.%d.%d\n", XR_VERSION_MAJOR(instance_props.runtimeVersion),
-		   XR_VERSION_MINOR(instance_props.runtimeVersion),
-		   XR_VERSION_PATCH(instance_props.runtimeVersion));
+	std::cout
+		<< "Runtime Name: " << instance_props.runtimeName << "\n"
+		<< "Runtime Version: " << XR_VERSION_MAJOR(instance_props.runtimeVersion) << "." << XR_VERSION_MINOR(instance_props.runtimeVersion) << "." << XR_VERSION_PATCH(instance_props.runtimeVersion) << std::endl;
 }
 
-void
-print_system_properties(XrSystemProperties* system_properties, bool hand_tracking_ext)
+void print_system_properties(XrSystemProperties* system_properties, bool hand_tracking_ext)
 {
-	printf("System properties for system %lu: \"%s\", vendor ID %d\n", system_properties->systemId,
-		   system_properties->systemName, system_properties->vendorId);
-	printf("\tMax layers          : %d\n", system_properties->graphicsProperties.maxLayerCount);
-	printf("\tMax swapchain height: %d\n",
-		   system_properties->graphicsProperties.maxSwapchainImageHeight);
-	printf("\tMax swapchain width : %d\n",
-		   system_properties->graphicsProperties.maxSwapchainImageWidth);
-	printf("\tOrientation Tracking: %d\n", system_properties->trackingProperties.orientationTracking);
-	printf("\tPosition Tracking   : %d\n", system_properties->trackingProperties.positionTracking);
+	std::cout
+		<< "System properties for system " << system_properties->systemId  << " \""
+		<< system_properties->systemName << "\", vendor ID " << system_properties->vendorId << "\n"
+		<< "\tMax layers          : " << system_properties->graphicsProperties.maxLayerCount << "\n"
+		<< "\tMax swapchain height: " << system_properties->graphicsProperties.maxSwapchainImageHeight << "\n"
+		<< "\tMax swapchain width : " << system_properties->graphicsProperties.maxSwapchainImageWidth << "\n"
+		<< "\tOrientation Tracking: " << system_properties->trackingProperties.orientationTracking << "\n"
+		<< "\tPosition Tracking   : " << system_properties->trackingProperties.positionTracking << std::endl;
 
 	if (hand_tracking_ext) {
-		XrSystemHandTrackingPropertiesEXT* ht =
-		    (XrSystemHandTrackingPropertiesEXT*)system_properties->next;
-		printf("\tHand Tracking       : %d\n", ht->supportsHandTracking);
+		XrSystemHandTrackingPropertiesEXT* ht = (XrSystemHandTrackingPropertiesEXT*)system_properties->next;
+		std::cout << "\tHand Tracking       : " << ht->supportsHandTracking << std::endl;
 	}
 }
 
-void
-print_supported_view_configs(xr_example* self)
+void print_supported_view_configs(XrExample* self)
 {
 	XrResult result;
 
 	uint32_t view_config_count;
-	result =
-		xrEnumerateViewConfigurations(self->instance, self->system_id, 0, &view_config_count, NULL);
+	result = xrEnumerateViewConfigurations(self->instance, self->system_id, 0, &view_config_count, NULL);
 	if (!xr_result(self->instance, result, "Failed to get view configuration count"))
 		return;
 
-	printf("Runtime supports %d view configurations\n", view_config_count);
+	std::cout << "Runtime supports " << view_config_count << " view configurations\n";
 
 	std::vector<XrViewConfigurationType> view_configs(view_config_count);
-	result = xrEnumerateViewConfigurations(self->instance, self->system_id, view_config_count,
-										   &view_config_count, view_configs.data());
+	result = xrEnumerateViewConfigurations(self->instance, self->system_id, view_config_count, &view_config_count, view_configs.data());
 	if (!xr_result(self->instance, result, "Failed to enumerate view configurations!"))
 		return;
 
-	printf("Runtime supports view configurations:\n");
+	std::cout << "Runtime supports view configurations:\n";
 	for (uint32_t i = 0; i < view_config_count; ++i) {
 		XrViewConfigurationProperties props = {.type = XR_TYPE_VIEW_CONFIGURATION_PROPERTIES,
 											   .next = NULL};
 
-		result =
-			xrGetViewConfigurationProperties(self->instance, self->system_id, view_configs[i], &props);
+		result = xrGetViewConfigurationProperties(self->instance, self->system_id, view_configs[i], &props);
 		if (!xr_result(self->instance, result, "Failed to get view configuration info %d!", i))
 			return;
 
-		printf("%d: FOV mutable: %d\n", props.viewConfigurationType, props.fovMutable);
+		std::cout << props.viewConfigurationType << ": FOV mutable: "<< props.fovMutable << "\n";
 	}
 }
 
-void
-print_viewconfig_view_info(xr_example* self)
+void print_viewconfig_view_info(XrExample* self)
 {
-	for (uint32_t i = 0; i < self->view_count; i++) {
+	for (uint32_t i = 0; i < self->viewconfig_views.size(); i++) {
 		printf("View Configuration View %d:\n", i);
 		printf("\tResolution       : Recommended %dx%d, Max: %dx%d\n",
 			   self->viewconfig_views[0].recommendedImageRectWidth,
@@ -250,15 +236,13 @@ print_viewconfig_view_info(xr_example* self)
 	}
 }
 
-bool
-check_opengl_version(XrGraphicsRequirementsOpenGLKHR* opengl_reqs)
+bool check_opengl_version(XrGraphicsRequirementsOpenGLKHR* opengl_reqs)
 {
 	XrVersion desired_opengl_version = XR_MAKE_VERSION(3, 3, 0);
 	if (desired_opengl_version > opengl_reqs->maxApiVersionSupported ||
 		desired_opengl_version < opengl_reqs->minApiVersionSupported) {
 		printf(
-			"We want OpenGL %d.%d.%d, but runtime only supports OpenGL "
-			"%d.%d.%d - %d.%d.%d!\n",
+			"We want OpenGL %d.%d.%d, but runtime only supports OpenGL %d.%d.%d - %d.%d.%d!\n",
 			XR_VERSION_MAJOR(desired_opengl_version), XR_VERSION_MINOR(desired_opengl_version),
 			XR_VERSION_PATCH(desired_opengl_version),
 			XR_VERSION_MAJOR(opengl_reqs->minApiVersionSupported),
@@ -272,8 +256,7 @@ check_opengl_version(XrGraphicsRequirementsOpenGLKHR* opengl_reqs)
 	return true;
 }
 
-void
-print_reference_spaces(xr_example* self)
+void print_reference_spaces(XrExample* self)
 {
 	XrResult result;
 
@@ -301,8 +284,7 @@ print_reference_spaces(xr_example* self)
 	}
 }
 
-int
-init_openxr(xr_example* self)
+int init_openxr(XrExample* self)
 {
 	XrResult result;
 
@@ -447,20 +429,20 @@ init_openxr(xr_example* self)
 	// if not).
 	XrViewConfigurationType view_type = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
 
+	uint32_t view_count = 0;
 	result = xrEnumerateViewConfigurationViews(self->instance, self->system_id, view_type, 0,
-											   &self->view_count, NULL);
+											   &view_count, NULL);
 	if (!xr_result(self->instance, result, "Failed to get view configuration view count!"))
 		return 1;
 
-	self->viewconfig_views = new XrViewConfigurationView[self->view_count];
-	for (uint32_t i = 0; i < self->view_count; i++) {
+	self->viewconfig_views.resize(view_count);
+	for (uint32_t i = 0; i < self->viewconfig_views.size(); i++) {
 		self->viewconfig_views[i].type = XR_TYPE_VIEW_CONFIGURATION_VIEW;
 		self->viewconfig_views[i].next = NULL;
 	}
 
 	result = xrEnumerateViewConfigurationViews(self->instance, self->system_id, view_type,
-											   self->view_count, &self->view_count,
-											   self->viewconfig_views);
+		view_count, &view_count, self->viewconfig_views.data());
 	if (!xr_result(self->instance, result, "Failed to enumerate view configuration views!"))
 		return 1;
 	print_viewconfig_view_info(self);
@@ -635,10 +617,10 @@ init_openxr(xr_example* self)
 	 * Here we use one swapchain per view (eye), and for example 3 ("triple buffering") images per
 	 * swapchain.
 	 */
-	self->swapchains = new XrSwapchain[self->view_count];
-	self->swapchain_lengths = new uint32_t[self->view_count];
-	self->images = new XrSwapchainImageOpenGLKHR*[ self->view_count];
-	for (uint32_t i = 0; i < self->view_count; i++) {
+	self->swapchains.resize(view_count);
+	self->swapchain_lengths.resize(view_count);
+	self->images.resize(view_count);
+	for (uint32_t i = 0; i < view_count; i++) {
 		XrSwapchainCreateInfo swapchain_create_info;
 		swapchain_create_info.type = XR_TYPE_SWAPCHAIN_CREATE_INFO;
 		swapchain_create_info.usageFlags = XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT;
@@ -661,14 +643,14 @@ init_openxr(xr_example* self)
 			return 1;
 
 		// these are wrappers for the actual OpenGL texture id
-		self->images[i] = new XrSwapchainImageOpenGLKHR[ self->swapchain_lengths[i]];
+		self->images[i].resize( self->swapchain_lengths[i]);
 		for (uint32_t j = 0; j < self->swapchain_lengths[i]; j++) {
 			self->images[i][j].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
 			self->images[i][j].next = NULL;
 		}
 		result = xrEnumerateSwapchainImages(self->swapchains[i], self->swapchain_lengths[i],
 											&self->swapchain_lengths[i],
-											(XrSwapchainImageBaseHeader*)self->images[i]);
+											(XrSwapchainImageBaseHeader*)self->images[i].data());
 		if (!xr_result(self->instance, result, "Failed to enumerate swapchain images"))
 			return 1;
 	}
@@ -678,10 +660,10 @@ init_openxr(xr_example* self)
 	 * For this, we create one framebuffer per OpenGL texture.
 	 * This is not mandated by OpenXR, other ways to render to textures will work too.
 	 */
-	self->framebuffers = new GLuint*[self->view_count];
-	for (uint32_t i = 0; i < self->view_count; i++) {
-		self->framebuffers[i] = new GLuint[self->swapchain_lengths[i]];
-		glGenFramebuffers(self->swapchain_lengths[i], self->framebuffers[i]);
+	self->framebuffers.resize(view_count);
+	for (uint32_t i = 0; i < view_count; i++) {
+		self->framebuffers[i].resize(self->swapchain_lengths[i]);
+		glGenFramebuffers(self->swapchain_lengths[i], self->framebuffers[i].data());
 	}
 
 	if (self->depth_swapchain_format == -1) {
@@ -690,10 +672,10 @@ init_openxr(xr_example* self)
 	}
 
 	if (self->depth_swapchain_format != -1) {
-		self->depth_swapchains = new XrSwapchain[self->view_count];
-		self->depth_swapchain_lengths = new uint32_t[self->view_count];
-		self->depth_images = new XrSwapchainImageOpenGLKHR*[ self->view_count];
-		for (uint32_t i = 0; i < self->view_count; i++) {
+		self->depth_swapchains.resize(view_count);
+		self->depth_swapchain_lengths.resize(view_count);
+		self->depth_images.resize( view_count);
+		for (uint32_t i = 0; i < view_count; i++) {
 			XrSwapchainCreateInfo swapchain_create_info;
 			swapchain_create_info.type = XR_TYPE_SWAPCHAIN_CREATE_INFO;
 			swapchain_create_info.usageFlags = XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
@@ -717,14 +699,14 @@ init_openxr(xr_example* self)
 				return 1;
 
 			// these are wrappers for the actual OpenGL texture id
-			self->depth_images[i] =new XrSwapchainImageOpenGLKHR[ self->depth_swapchain_lengths[i]];
+			self->depth_images[i].resize(self->depth_swapchain_lengths[i]);
 			for (uint32_t j = 0; j < self->depth_swapchain_lengths[i]; j++) {
 				self->depth_images[i][j].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
 				self->depth_images[i][j].next = NULL;
 			}
 			result = xrEnumerateSwapchainImages(
 				self->depth_swapchains[i], self->depth_swapchain_lengths[i],
-				&self->depth_swapchain_lengths[i], (XrSwapchainImageBaseHeader*)self->depth_images[i]);
+				&self->depth_swapchain_lengths[i], (XrSwapchainImageBaseHeader*)self->depth_images[i].data());
 			if (!xr_result(self->instance, result, "Failed to enumerate swapchain images"))
 				return 1;
 		}
@@ -750,20 +732,19 @@ init_openxr(xr_example* self)
 		if (!xr_result(self->instance, result, "Failed to create swapchain!"))
 			return 1;
 
-		result =
-			xrEnumerateSwapchainImages(self->quad_swapchain, 0, &self->quad_swapchain_length, NULL);
+		result = xrEnumerateSwapchainImages(self->quad_swapchain, 0, &self->quad_swapchain_length, NULL);
 		if (!xr_result(self->instance, result, "Failed to enumerate swapchains"))
 			return 1;
 
 		// these are wrappers for the actual OpenGL texture id
-		self->quad_images = new XrSwapchainImageOpenGLKHR[ self->quad_swapchain_length];
+		self->quad_images.resize(self->quad_swapchain_length);
 		for (uint32_t j = 0; j < self->quad_swapchain_length; j++) {
 			self->quad_images[j].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
 			self->quad_images[j].next = NULL;
 		}
 		result = xrEnumerateSwapchainImages(self->quad_swapchain, self->quad_swapchain_length,
 											&self->quad_swapchain_length,
-											(XrSwapchainImageBaseHeader*)self->quad_images);
+											(XrSwapchainImageBaseHeader*)self->quad_images.data());
 		if (!xr_result(self->instance, result, "Failed to enumerate swapchain images"))
 			return 1;
 	}
@@ -794,14 +775,14 @@ init_openxr(xr_example* self)
 			return 1;
 
 		// these are wrappers for the actual OpenGL texture id
-		self->cylinder.images = new XrSwapchainImageOpenGLKHR[ self->cylinder.swapchain_length];
+		self->cylinder.images.resize(self->cylinder.swapchain_length);
 		for (uint32_t j = 0; j < self->cylinder.swapchain_length; j++) {
 			self->cylinder.images[j].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
 			self->cylinder.images[j].next = NULL;
 		}
 		result = xrEnumerateSwapchainImages(self->cylinder.swapchain, self->cylinder.swapchain_length,
 											&self->cylinder.swapchain_length,
-											(XrSwapchainImageBaseHeader*)self->cylinder.images);
+											(XrSwapchainImageBaseHeader*)self->cylinder.images.data());
 		if (!xr_result(self->instance, result, "Failed to enumerate swapchain images"))
 			return 1;
 	}
@@ -812,10 +793,9 @@ init_openxr(xr_example* self)
 
 	// A stereo view config implies two views, but our code is set up for a dynamic amount of views.
 	// So we need to allocate a bunch of memory for data structures dynamically.
-	self->views = (XrView*)malloc(sizeof(XrView) * self->view_count);
-	self->projection_views = (XrCompositionLayerProjectionView*)malloc(
-		sizeof(XrCompositionLayerProjectionView) * self->view_count);
-	for (uint32_t i = 0; i < self->view_count; i++) {
+	self->views.resize(view_count);
+	self->projection_views.resize(view_count);
+	for (uint32_t i = 0; i < view_count; i++) {
 		self->views[i].type = XR_TYPE_VIEW;
 		self->views[i].next = NULL;
 
@@ -836,9 +816,8 @@ init_openxr(xr_example* self)
 
 	// analog to projection layer allocation, though we can actually fill everything in here
 	if (self->depth.supported) {
-		self->depth.infos = (XrCompositionLayerDepthInfoKHR*)malloc(
-			sizeof(XrCompositionLayerDepthInfoKHR) * self->view_count);
-		for (uint32_t i = 0; i < self->view_count; i++) {
+		self->depth.infos.resize(view_count);
+		for (uint32_t i = 0; i < view_count; i++) {
 			self->depth.infos[i].type = XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR;
 			self->depth.infos[i].next = NULL;
 			self->depth.infos[i].minDepth = 0.f;
@@ -863,8 +842,7 @@ init_openxr(xr_example* self)
 	return 0;
 }
 
-void
-main_loop(xr_example* self)
+void main_loop(XrExample* self)
 {
 	XrResult result;
 
@@ -887,7 +865,7 @@ main_loop(xr_example* self)
 										  .next = NULL,
 										  .actionType = XR_ACTION_TYPE_FLOAT_INPUT,
 										  .countSubactionPaths = HAND_COUNT,
-										  .subactionPaths = self->hand_paths};
+										  .subactionPaths = self->hand_paths.data()};
 		strcpy(action_info.actionName, "grabobjectfloat");
 		strcpy(action_info.localizedActionName, "Grab Object");
 
@@ -903,7 +881,7 @@ main_loop(xr_example* self)
 										  .next = NULL,
 										  .actionType = XR_ACTION_TYPE_FLOAT_INPUT,
 										  .countSubactionPaths = HAND_COUNT,
-										  .subactionPaths = self->hand_paths};
+										  .subactionPaths = self->hand_paths.data() };
 		strcpy(action_info.actionName, "throttle");
 		strcpy(action_info.localizedActionName, "Use Throttle forward/backward");
 
@@ -918,7 +896,7 @@ main_loop(xr_example* self)
 										  .next = NULL,
 										  .actionType = XR_ACTION_TYPE_POSE_INPUT,
 										  .countSubactionPaths = HAND_COUNT,
-										  .subactionPaths = self->hand_paths};
+										  .subactionPaths = self->hand_paths.data() };
 		strcpy(action_info.actionName, "handpose");
 		strcpy(action_info.localizedActionName, "Hand Pose");
 
@@ -933,7 +911,7 @@ main_loop(xr_example* self)
 										  .next = NULL,
 										  .actionType = XR_ACTION_TYPE_VIBRATION_OUTPUT,
 										  .countSubactionPaths = HAND_COUNT,
-										  .subactionPaths = self->hand_paths};
+										  .subactionPaths = self->hand_paths.data() };
 		strcpy(action_info.actionName, "haptic");
 		strcpy(action_info.localizedActionName, "Haptic Vibration");
 		result = xrCreateAction(main_actionset, &action_info, &haptic_action);
@@ -1061,8 +1039,6 @@ main_loop(xr_example* self)
 	result = xrAttachSessionActionSets(self->session, &actionset_attach_info);
 	if (!xr_result(self->instance, result, "failed to attach action set"))
 		return;
-
-
 
 	int loop_count = 0;
 	while (true) {
@@ -1240,15 +1216,15 @@ main_loop(xr_example* self)
 											 .displayTime = frameState.predictedDisplayTime,
 											 .space = self->play_space};
 
-		std::vector<XrView> views(self->view_count);
-		for (uint32_t i = 0; i < self->view_count; i++) {
+		uint32_t view_count = self->viewconfig_views.size();
+		std::vector<XrView> views(view_count);
+		for (uint32_t i = 0; i < view_count; i++) {
 			views[i].type = XR_TYPE_VIEW;
 			views[i].next = NULL;
 		};
 
 		XrViewState view_state = {.type = XR_TYPE_VIEW_STATE, .next = NULL};
-		uint32_t view_count;
-		result = xrLocateViews(self->session, &view_locate_info, &view_state, self->view_count,
+		result = xrLocateViews(self->session, &view_locate_info, &view_state, view_count,
 							   &view_count, views.data());
 		if (!xr_result(self->instance, result, "Could not locate views"))
 			break;
@@ -1364,7 +1340,7 @@ main_loop(xr_example* self)
 
 
 		// render each eye and fill projection_views with the result
-		for (uint32_t i = 0; i < self->view_count; i++) {
+		for (uint32_t i = 0; i < view_count; i++) {
 			XrMatrix4x4f projection_matrix;
 			XrMatrix4x4f_CreateProjectionFov(&projection_matrix, GRAPHICS_OPENGL, views[i].fov,
 											 self->near_z, self->far_z);
@@ -1487,8 +1463,8 @@ main_loop(xr_example* self)
 			.next = NULL,
 			.layerFlags = 0,
 			.space = self->play_space,
-			.viewCount = self->view_count,
-			.views = self->projection_views,
+			.viewCount = view_count,
+			.views = self->projection_views.data(),
 		};
 
 		float aspect = (float)self->quad_pixel_width / (float)self->quad_pixel_height;
@@ -1560,8 +1536,7 @@ main_loop(xr_example* self)
 	}
 }
 
-void
-sdl_handle_events(SDL_Event event, bool* request_exit)
+void sdl_handle_events(SDL_Event event, bool* request_exit)
 {
 	if (event.type == SDL_QUIT ||
 		(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) {
@@ -1569,8 +1544,7 @@ sdl_handle_events(SDL_Event event, bool* request_exit)
 	}
 }
 
-void
-cleanup(xr_example* self)
+void cleanup(XrExample* self)
 {
 	XrResult result;
 
@@ -1599,39 +1573,17 @@ cleanup(xr_example* self)
 
 	xrDestroySession(self->session);
 
-	for (uint32_t i = 0; i < self->view_count; i++) {
-		free(self->images[i]);
-		if (self->depth_swapchain_format != -1) {
-			free(self->depth_images[i]);
-		}
-
-		glDeleteFramebuffers(self->swapchain_lengths[i], self->framebuffers[i]);
-		free(self->framebuffers[i]);
+	for (uint32_t i = 0; i < self->viewconfig_views.size(); i++) {
+		glDeleteFramebuffers(self->swapchain_lengths[i], self->framebuffers[i].data());
 	}
 	xrDestroyInstance(self->instance);
-
-	free(self->viewconfig_views);
-	free(self->projection_views);
-	free(self->views);
-	free(self->swapchains);
-	free(self->depth_swapchains);
-	free(self->images);
-	free(self->depth_images);
-	free(self->framebuffers);
-	free(self->swapchain_lengths);
-	free(self->depth_swapchain_lengths);
-
-	free(self->depth.infos);
 
 	cleanup_gl();
 }
 
-int
-main()
+int main()
 {
-	xr_example self = {
-		.instance = XR_NULL_HANDLE,
-	};
+	XrExample self;
 	int ret = init_openxr(&self);
 	if (ret != 0)
 		return ret;
