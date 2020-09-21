@@ -280,9 +280,6 @@ render_frame(int w,
 			 int h,
 			 XrMatrix4x4f projectionmatrix,
 			 XrMatrix4x4f viewmatrix,
-			 XrSpaceLocation* hand_locations,
-			 bool* hand_locations_valid,
-			 XrHandJointLocationsEXT* joint_locations,
 			 GLuint framebuffer,
 			 XrSwapchainImageOpenGLKHR image,
 			 int view_index,
@@ -325,48 +322,6 @@ render_frame(int w,
 	glUniformMatrix4fv(viewLoc, 1, GL_FALSE, (float*)viewmatrix.m);
 	int projLoc = glGetUniformLocation(shaderProgramID, "proj");
 	glUniformMatrix4fv(projLoc, 1, GL_FALSE, (float*)projectionmatrix.m);
-
-	int modelLoc = glGetUniformLocation(shaderProgramID, "model");
-	for (int hand = 0; hand < 2; hand++) {
-		if (hand == 0) {
-			glUniform3f(color, 1.0, 0.5, 0.5);
-		} else {
-			glUniform3f(color, 0.5, 1.0, 0.5);
-		}
-
-		// draw blocks for controller locations if hand tracking is not available
-		if (!joint_locations[hand].isActive) {
-
-			if (!hand_locations_valid[hand])
-				continue;
-
-			XrMatrix4x4f matrix;
-			XrVector3f scale = {.x = .05f, .y = .05f, .z = .2f};
-			XrMatrix4x4f_CreateModelMatrix(&matrix, &hand_locations[hand].pose.position,
-										   &hand_locations[hand].pose.orientation, &scale);
-			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (float*)matrix.m);
-
-			glDrawArrays(GL_TRIANGLES, 0, 36);
-			continue;
-		}
-
-		for (uint32_t i = 0; i < joint_locations[hand].jointCount; i++) {
-			struct XrHandJointLocationEXT* joint_location = &joint_locations[hand].jointLocations[i];
-
-			if (!(joint_location->locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT)) {
-				continue;
-			}
-
-			float size = joint_location->radius;
-
-			XrVector3f scale = {.x = size, .y = size, .z = size};
-			XrMatrix4x4f joint_matrix;
-			XrMatrix4x4f_CreateModelMatrix(&joint_matrix, &joint_location->pose.position,
-										   &joint_location->pose.orientation, &scale);
-			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (float*)joint_matrix.m);
-			glDrawArrays(GL_TRIANGLES, 0, 36);
-		}
-	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
