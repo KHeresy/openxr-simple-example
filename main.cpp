@@ -311,6 +311,7 @@ int init_openxr(XrExample* self)
 		if (strcmp(XR_KHR_OPENGL_ENABLE_EXTENSION_NAME, extensionProperties[i].extensionName) == 0) {
 			opengl_ext = true;
 		}
+
 		if (strcmp(XR_EXT_HAND_TRACKING_EXTENSION_NAME, extensionProperties[i].extensionName) == 0) {
 			self->hand_tracking.supported = true;
 		}
@@ -353,18 +354,16 @@ int init_openxr(XrExample* self)
 		XR_TYPE_INSTANCE_CREATE_INFO,
 		nullptr,
 		0,
-	    {
-	        "", 1,
-	        "", 0,
-	        XR_CURRENT_API_VERSION,
-	    },
+		{
+			"OpenXR OpenGL Example", 1,
+			"Custom", 0,
+			XR_CURRENT_API_VERSION,
+		},
 		0,
 		NULL,
-	    enabled_ext_count,
+		enabled_ext_count,
 		enabled_exts
 	};
-	strncpy(instance_create_info.applicationInfo.applicationName, "OpenXR OpenGL Example", XR_MAX_APPLICATION_NAME_SIZE);
-	strncpy(instance_create_info.applicationInfo.engineName, "Custom", XR_MAX_ENGINE_NAME_SIZE);
 
 	result = xrCreateInstance(&instance_create_info, &self->instance);
 	if (!xr_result(NULL, result, "Failed to create XR instance."))
@@ -481,15 +480,11 @@ int init_openxr(XrExample* self)
 	printf("Successfully created a session with OpenGL!\n");
 
 	if (self->hand_tracking.system_supported) {
-		result =
-			xrGetInstanceProcAddr(self->instance, "xrLocateHandJointsEXT",
-								  (PFN_xrVoidFunction*)&self->hand_tracking.pfnLocateHandJointsEXT);
-
+		result = xrGetInstanceProcAddr(self->instance, "xrLocateHandJointsEXT", (PFN_xrVoidFunction*)&self->hand_tracking.pfnLocateHandJointsEXT);
 		xr_result(self->instance, result, "Failed to get xrLocateHandJointsEXT function!");
 
 		PFN_xrCreateHandTrackerEXT pfnCreateHandTrackerEXT = NULL;
-		result = xrGetInstanceProcAddr(self->instance, "xrCreateHandTrackerEXT",
-									   (PFN_xrVoidFunction*)&pfnCreateHandTrackerEXT);
+		result = xrGetInstanceProcAddr(self->instance, "xrCreateHandTrackerEXT", (PFN_xrVoidFunction*)&pfnCreateHandTrackerEXT);
 
 		if (!xr_result(self->instance, result, "Failed to get xrCreateHandTrackerEXT function!"))
 			return 1;
@@ -536,14 +531,11 @@ int init_openxr(XrExample* self)
 		return 1;
 
 	// --- Begin session
-	XrSessionBeginInfo session_begin_info = {
-		.type = XR_TYPE_SESSION_BEGIN_INFO, .next = NULL, .primaryViewConfigurationType = view_type};
+	XrSessionBeginInfo session_begin_info = { .type = XR_TYPE_SESSION_BEGIN_INFO, .next = NULL, .primaryViewConfigurationType = view_type};
 	result = xrBeginSession(self->session, &session_begin_info);
 	if (!xr_result(self->instance, result, "Failed to begin session!"))
 		return 1;
 	printf("Session started!\n");
-
-
 
 	// --- Create Swapchains
 	uint32_t swapchain_format_count;
@@ -568,22 +560,24 @@ int init_openxr(XrExample* self)
 	self->quad_swapchain_format = swapchain_formats[0];
 	self->cylinder.format = swapchain_formats[0];
 	self->depth_swapchain_format = -1;
-	for (uint32_t i = 0; i < swapchain_format_count; i++) {
-		printf("Supported GL format: %#lx\n", swapchain_formats[i]);
-		if (swapchain_formats[i] == preferred_swapchain_format) {
-			self->swapchain_format = swapchain_formats[i];
+	for (auto& swapchain_format : swapchain_formats)
+	{
+		printf("Supported GL format: %#lx\n", swapchain_format);
+		if (swapchain_format == preferred_swapchain_format) {
+			self->swapchain_format = swapchain_format;
 			printf("Using preferred swapchain format %#lx\n", self->swapchain_format);
 		}
-		if (swapchain_formats[i] == preferred_depth_swapchain_format) {
-			self->depth_swapchain_format = swapchain_formats[i];
+		if (swapchain_format == preferred_depth_swapchain_format) {
+			self->depth_swapchain_format = swapchain_format;
 			printf("Using preferred depth swapchain format %#lx\n", self->depth_swapchain_format);
 		}
-		if (swapchain_formats[i] == preferred_quad_swapchain_format) {
-			self->quad_swapchain_format = swapchain_formats[i];
-			self->cylinder.format = swapchain_formats[i];
+		if (swapchain_format == preferred_quad_swapchain_format) {
+			self->quad_swapchain_format = swapchain_format;
+			self->cylinder.format = swapchain_format;
 			printf("Using preferred quad swapchain format %#lx\n", self->quad_swapchain_format);
 		}
 	}
+
 	if (self->swapchain_format != preferred_swapchain_format) {
 		printf("Using non preferred swapchain format %#lx\n", self->swapchain_format);
 	}
@@ -794,8 +788,7 @@ void main_loop(XrExample* self)
 {
 	XrResult result;
 
-	XrActionSetCreateInfo main_actionset_info = {
-		.type = XR_TYPE_ACTION_SET_CREATE_INFO, .next = NULL, .priority = 0};
+	XrActionSetCreateInfo main_actionset_info = { .type = XR_TYPE_ACTION_SET_CREATE_INFO, .next = NULL, .priority = 0};
 	strcpy(main_actionset_info.actionSetName, "mainactions");
 	strcpy(main_actionset_info.localizedActionSetName, "Main Actions");
 
