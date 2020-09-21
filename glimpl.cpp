@@ -284,7 +284,6 @@ render_frame(int w,
 			 bool* hand_locations_valid,
 			 XrHandJointLocationsEXT* joint_locations,
 			 GLuint framebuffer,
-			 GLuint depthbuffer,
 			 XrSwapchainImageOpenGLKHR image,
 			 int view_index,
 			 XrTime predictedDisplayTime)
@@ -295,11 +294,11 @@ render_frame(int w,
 	glScissor(0, 0, w, h);
 
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, image.image, 0);
-	if (depthbuffer != UINT32_MAX) {
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthbuffer, 0);
-	} else {
-		// TODO: need a depth attachment for depth test when rendering to fbo
-	}
+	//if (depthbuffer != UINT32_MAX) {
+	//	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthbuffer, 0);
+	//} else {
+	//	// TODO: need a depth attachment for depth test when rendering to fbo
+	//}
 
 	glClearColor(.0f, 0.0f, 0.2f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

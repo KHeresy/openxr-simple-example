@@ -47,7 +47,6 @@ render_frame(int w,
              bool* hand_locations_valid,
              XrHandJointLocationsEXT* joint_locations,
              GLuint framebuffer,
-             GLuint depthbuffer,
              XrSwapchainImageOpenGLKHR image,
              int view_index,
              XrTime predictedDisplayTime);

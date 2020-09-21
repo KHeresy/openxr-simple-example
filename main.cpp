@@ -82,10 +82,6 @@ public:
 	// one swapchain per view. Using only one and rendering l/r to the same image is also possible.
 	std::vector<XrSwapchain> swapchains;
 
-	int64_t depth_swapchain_format;
-	std::vector<std::vector<XrSwapchainImageOpenGLKHR>> depth_images;
-	std::vector<XrSwapchain> depth_swapchains;
-
 	// quad layers are placed into world space, no need to render them per eye
 	int64_t quad_swapchain_format;
 	uint32_t quad_pixel_width, quad_pixel_height;
@@ -95,24 +91,6 @@ public:
 
 	float near_z;
 	float far_z;
-
-	// depth layer data
-	struct
-	{
-		bool supported;
-		std::vector<XrCompositionLayerDepthInfoKHR> infos;
-	} depth;
-
-	// cylinder layer extension data
-	struct
-	{
-		bool supported;
-		int64_t format;
-		uint32_t swapchain_width, swapchain_height;
-		uint32_t swapchain_length;
-		std::vector<XrSwapchainImageOpenGLKHR> images;
-		XrSwapchain swapchain;
-	} cylinder;
 
 	// To render into a texture we need a framebuffer (one per texture to make it easy)
 	std::vector<std::vector<GLuint>> framebuffers;
@@ -315,14 +293,6 @@ int init_openxr(XrExample* self)
 		if (strcmp(XR_EXT_HAND_TRACKING_EXTENSION_NAME, extensionProperties[i].extensionName) == 0) {
 			self->hand_tracking.supported = true;
 		}
-
-		if (strcmp(XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME, extensionProperties[i].extensionName) == 0) {
-			self->cylinder.supported = true;
-		}
-
-		if (strcmp(XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME, extensionProperties[i].extensionName) == 0) {
-			self->depth.supported = true;
-		}
 	}
 
 	// A graphics extension like OpenGL is required to draw anything in VR
@@ -334,8 +304,6 @@ int init_openxr(XrExample* self)
 	printf("Runtime supports extensions:\n");
 	printf("\t%s: %d\n", XR_KHR_OPENGL_ENABLE_EXTENSION_NAME, opengl_ext);
 	printf("\t%s: %d\n", XR_EXT_HAND_TRACKING_EXTENSION_NAME, self->hand_tracking.supported);
-	printf("\t%s: %d\n", XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME, self->cylinder.supported);
-	printf("\t%s: %d\n", XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME, self->depth.supported);
 
 	// --- Create XrInstance
 	int enabled_ext_count = 1;
@@ -343,9 +311,6 @@ int init_openxr(XrExample* self)
 
 	if (self->hand_tracking.supported) {
 		enabled_exts[enabled_ext_count++] = XR_EXT_HAND_TRACKING_EXTENSION_NAME;
-	}
-	if (self->cylinder.supported) {
-		enabled_exts[enabled_ext_count++] = XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME;
 	}
 
 	// same can be done for API layers, but API layers can also be enabled by env var
@@ -558,8 +523,6 @@ int init_openxr(XrExample* self)
 
 	self->swapchain_format = swapchain_formats[0];
 	self->quad_swapchain_format = swapchain_formats[0];
-	self->cylinder.format = swapchain_formats[0];
-	self->depth_swapchain_format = -1;
 	for (auto& swapchain_format : swapchain_formats)
 	{
 		printf("Supported GL format: %#lx\n", swapchain_format);
@@ -567,13 +530,8 @@ int init_openxr(XrExample* self)
 			self->swapchain_format = swapchain_format;
 			printf("Using preferred swapchain format %#lx\n", self->swapchain_format);
 		}
-		if (swapchain_format == preferred_depth_swapchain_format) {
-			self->depth_swapchain_format = swapchain_format;
-			printf("Using preferred depth swapchain format %#lx\n", self->depth_swapchain_format);
-		}
 		if (swapchain_format == preferred_quad_swapchain_format) {
 			self->quad_swapchain_format = swapchain_format;
-			self->cylinder.format = swapchain_format;
 			printf("Using preferred quad swapchain format %#lx\n", self->quad_swapchain_format);
 		}
 	}
@@ -630,45 +588,6 @@ int init_openxr(XrExample* self)
 		glGenFramebuffers(self->framebuffers[i].size(), self->framebuffers[i].data());
 	}
 
-	if (self->depth_swapchain_format == -1) {
-		printf("Preferred depth swapchain format %#lx not supported!\n",
-			   preferred_depth_swapchain_format);
-	}
-
-	if (self->depth_swapchain_format != -1) {
-		self->depth_swapchains.resize(view_count);
-		self->depth_images.resize( view_count);
-		for (uint32_t i = 0; i < view_count; i++) {
-			XrSwapchainCreateInfo swapchain_create_info;
-			swapchain_create_info.type = XR_TYPE_SWAPCHAIN_CREATE_INFO;
-			swapchain_create_info.usageFlags = XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-			swapchain_create_info.createFlags = 0;
-			swapchain_create_info.format = self->depth_swapchain_format;
-			swapchain_create_info.sampleCount = self->viewconfig_views[i].recommendedSwapchainSampleCount;
-			swapchain_create_info.width = self->viewconfig_views[i].recommendedImageRectWidth;
-			swapchain_create_info.height = self->viewconfig_views[i].recommendedImageRectHeight;
-			swapchain_create_info.faceCount = 1;
-			swapchain_create_info.arraySize = 1;
-			swapchain_create_info.mipCount = 1;
-			swapchain_create_info.next = NULL;
-
-			result = xrCreateSwapchain(self->session, &swapchain_create_info, &self->depth_swapchains[i]);
-			if (!xr_result(self->instance, result, "Failed to create swapchain %d!", i))
-				return 1;
-
-			uint32_t depth_swapchain_length;
-			result = xrEnumerateSwapchainImages(self->depth_swapchains[i], 0, &depth_swapchain_length, nullptr);
-			if (!xr_result(self->instance, result, "Failed to enumerate swapchains"))
-				return 1;
-
-			// these are wrappers for the actual OpenGL texture id
-			self->depth_images[i].resize(depth_swapchain_length, { XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR , nullptr});
-			result = xrEnumerateSwapchainImages( self->depth_swapchains[i], depth_swapchain_length, &depth_swapchain_length, (XrSwapchainImageBaseHeader*)self->depth_images[i].data());
-			if (!xr_result(self->instance, result, "Failed to enumerate swapchain images"))
-				return 1;
-		}
-	}
-
 	{
 		self->quad_pixel_width = 800;
 		self->quad_pixel_height = 600;
@@ -702,41 +621,6 @@ int init_openxr(XrExample* self)
 			return 1;
 	}
 
-	if (self->cylinder.supported) {
-		self->cylinder.swapchain_width = 800;
-		self->cylinder.swapchain_height = 600;
-		XrSwapchainCreateInfo swapchain_create_info;
-		swapchain_create_info.type = XR_TYPE_SWAPCHAIN_CREATE_INFO;
-		swapchain_create_info.usageFlags = XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT;
-		swapchain_create_info.createFlags = 0;
-		swapchain_create_info.format = self->cylinder.format;
-		swapchain_create_info.sampleCount = 1;
-		swapchain_create_info.width = self->cylinder.swapchain_width;
-		swapchain_create_info.height = self->cylinder.swapchain_height;
-		swapchain_create_info.faceCount = 1;
-		swapchain_create_info.arraySize = 1;
-		swapchain_create_info.mipCount = 1;
-		swapchain_create_info.next = NULL;
-
-		result = xrCreateSwapchain(self->session, &swapchain_create_info, &self->cylinder.swapchain);
-		if (!xr_result(self->instance, result, "Failed to create swapchain!"))
-			return 1;
-
-		result = xrEnumerateSwapchainImages(self->cylinder.swapchain, 0,
-											&self->cylinder.swapchain_length, NULL);
-		if (!xr_result(self->instance, result, "Failed to enumerate swapchains"))
-			return 1;
-
-		// these are wrappers for the actual OpenGL texture id
-		self->cylinder.images.resize(self->cylinder.swapchain_length, { XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR , nullptr});
-		result = xrEnumerateSwapchainImages(self->cylinder.swapchain, self->cylinder.swapchain_length,
-											&self->cylinder.swapchain_length,
-											(XrSwapchainImageBaseHeader*)self->cylinder.images.data());
-		if (!xr_result(self->instance, result, "Failed to enumerate swapchain images"))
-			return 1;
-	}
-
-
 	self->near_z = 0.01f;
 	self->far_z = 100.f;
 
@@ -757,29 +641,6 @@ int init_openxr(XrExample* self)
 
 		// projection_views[i].pose (and fov) have to be filled every frame in frame loop
 	};
-
-	// analog to projection layer allocation, though we can actually fill everything in here
-	if (self->depth.supported) {
-		self->depth.infos.resize(view_count);
-		for (uint32_t i = 0; i < view_count; i++) {
-			self->depth.infos[i].type = XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR;
-			self->depth.infos[i].next = NULL;
-			self->depth.infos[i].minDepth = 0.f;
-			self->depth.infos[i].maxDepth = 1.f;
-			self->depth.infos[i].nearZ = self->near_z;
-			self->depth.infos[i].farZ = self->far_z;
-
-			self->depth.infos[i].subImage.swapchain = self->depth_swapchains[i];
-
-			self->depth.infos[i].subImage.imageArrayIndex = 0;
-			self->depth.infos[i].subImage.imageRect.offset.x = 0;
-			self->depth.infos[i].subImage.imageRect.offset.y = 0;
-			self->depth.infos[i].subImage.imageRect.extent.width = self->viewconfig_views[i].recommendedImageRectWidth;
-			self->depth.infos[i].subImage.imageRect.extent.height = self->viewconfig_views[i].recommendedImageRectHeight;
-
-			self->projection_views[i].next = &self->depth.infos[i];
-		};
-	}
 
 	return 0;
 }
@@ -1303,33 +1164,13 @@ void main_loop(XrExample* self)
 			if (!xr_result(self->instance, result, "failed to wait for swapchain image!"))
 				break;
 
-			uint32_t depth_acquired_index = UINT32_MAX;
-			if (self->depth_swapchain_format != -1) {
-				XrSwapchainImageAcquireInfo depth_acquire_info = {
-					.type = XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO, .next = NULL};
-				result = xrAcquireSwapchainImage(self->depth_swapchains[i], &depth_acquire_info,
-												 &depth_acquired_index);
-				if (!xr_result(self->instance, result, "failed to acquire swapchain image!"))
-					break;
-
-				XrSwapchainImageWaitInfo depth_wait_info = {
-					.type = XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO, .next = NULL, .timeout = 1000};
-				result = xrWaitSwapchainImage(self->depth_swapchains[i], &depth_wait_info);
-				if (!xr_result(self->instance, result, "failed to wait for swapchain image!"))
-					break;
-			}
-
 			self->projection_views[i].pose = views[i].pose;
 			self->projection_views[i].fov = views[i].fov;
-
-			GLuint depth_image = self->depth_swapchain_format != -1
-									 ? self->depth_images[i][depth_acquired_index].image
-									 : UINT32_MAX;
 
 			render_frame(self->viewconfig_views[i].recommendedImageRectWidth,
 						 self->viewconfig_views[i].recommendedImageRectHeight, projection_matrix,
 						 view_matrix, hand_locations, hand_locations_valid, joint_locations,
-						 self->framebuffers[i][acquired_index], depth_image,
+						 self->framebuffers[i][acquired_index],
 						 self->images[i][acquired_index], i, frameState.predictedDisplayTime);
 			glFinish();
 			XrSwapchainImageReleaseInfo release_info = {.type = XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO,
@@ -1337,14 +1178,6 @@ void main_loop(XrExample* self)
 			result = xrReleaseSwapchainImage(self->swapchains[i], &release_info);
 			if (!xr_result(self->instance, result, "failed to release swapchain image!"))
 				break;
-
-			if (self->depth_swapchain_format != -1) {
-				XrSwapchainImageReleaseInfo depth_release_info = {
-					.type = XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO, .next = NULL};
-				result = xrReleaseSwapchainImage(self->depth_swapchains[i], &depth_release_info);
-				if (!xr_result(self->instance, result, "failed to release swapchain image!"))
-					break;
-			}
 		}
 
 
@@ -1369,34 +1202,6 @@ void main_loop(XrExample* self)
 		result = xrReleaseSwapchainImage(self->quad_swapchain, &release_info);
 		if (!xr_result(self->instance, result, "failed to release swapchain image!"))
 			break;
-
-
-		if (self->cylinder.supported) {
-			XrSwapchainImageAcquireInfo acquire_info = {.type = XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO,
-														.next = NULL};
-			uint32_t acquired_index;
-			result = xrAcquireSwapchainImage(self->cylinder.swapchain, &acquire_info, &acquired_index);
-			if (!xr_result(self->instance, result, "failed to acquire swapchain image!"))
-				break;
-
-			XrSwapchainImageWaitInfo wait_info = {
-				.type = XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO, .next = NULL, .timeout = 1000};
-			result = xrWaitSwapchainImage(self->cylinder.swapchain, &wait_info);
-			if (!xr_result(self->instance, result, "failed to wait for swapchain image!"))
-				break;
-
-			render_quad(self->cylinder.swapchain_width, self->cylinder.swapchain_height,
-						self->cylinder.format, self->cylinder.images[acquired_index],
-						frameState.predictedDisplayTime);
-
-			XrSwapchainImageReleaseInfo release_info = {.type = XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO,
-														.next = NULL};
-			result = xrReleaseSwapchainImage(self->cylinder.swapchain, &release_info);
-			if (!xr_result(self->instance, result, "failed to release swapchain image!"))
-				break;
-		}
-
-
 
 		// projectionLayers struct reused for every frame
 		XrCompositionLayerProjection projection_layer = {
@@ -1424,45 +1229,17 @@ void main_loop(XrExample* self)
 				.swapchain = self->quad_swapchain,
 				.imageRect = {
 					.offset = {.x = 0, .y = 0},
-		                           .extent = {.width = (int32_t)self->quad_pixel_width,
-		                                      .height = (int32_t)self->quad_pixel_height},
+					.extent = {	.width = (int32_t)self->quad_pixel_width,
+								.height = (int32_t)self->quad_pixel_height},
 				}};
 
 
-		float cylinder_aspect =
-			(float)self->cylinder.swapchain_width / (float)self->cylinder.swapchain_height;
-
-		float threesixty = M_PI * 2 - 0.0001; /* TODO: spec issue range [0, 2π)*/
-
-		float angleratio = 1 + (loop_count % 1000) / 50.;
-		XrCompositionLayerCylinderKHR cylinder_layer = {
-			.type = XR_TYPE_COMPOSITION_LAYER_CYLINDER_KHR,
-			.next = NULL,
-			.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT,
-			.space = self->play_space,
-			.eyeVisibility = XR_EYE_VISIBILITY_BOTH,
-			.subImage = {.swapchain = self->cylinder.swapchain,
-						 .imageRect = {.offset = {.x = 0, .y = 0},
-		                               .extent = {.width = (int32_t)self->cylinder.swapchain_width,
-		                                          .height = (int32_t)self->cylinder.swapchain_height}}},
-			.pose = {.orientation = {.x = 0.f, .y = 0.f, .z = 0.f, .w = 1.f},
-					 .position = {.x = 1.5f, .y = 0.f, .z = -1.5f}},
-			.radius = 0.5,
-			.centralAngle = threesixty / 3,
-			.aspectRatio = cylinder_aspect};
-
 		int submitted_layer_count = 1;
-		const XrCompositionLayerBaseHeader* submittedLayers[3] = {
-			(const XrCompositionLayerBaseHeader* const) & projection_layer};
+		const XrCompositionLayerBaseHeader* submittedLayers[3] = { (const XrCompositionLayerBaseHeader* const) & projection_layer};
 
 		if (true) {
-			submittedLayers[submitted_layer_count++] =
-				(const XrCompositionLayerBaseHeader* const) & quad_layer;
+			submittedLayers[submitted_layer_count++] = (const XrCompositionLayerBaseHeader* const) & quad_layer;
 		}
-		if (self->cylinder.supported) {
-			submittedLayers[submitted_layer_count++] =
-				(const XrCompositionLayerBaseHeader* const) & cylinder_layer;
-		};
 
 		XrFrameEndInfo frameEndInfo;
 		frameEndInfo.type = XR_TYPE_FRAME_END_INFO;
