@@ -371,18 +371,18 @@ render_frame(int w,
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	if (view_index == 0) {
-		//glBlitNamedFramebuffer((GLuint)framebuffer,             // readFramebuffer
-		//						(GLuint)0,                       // backbuffer     // drawFramebuffer
-		//						(GLint)0,                        // srcX0
-		//						(GLint)0,                        // srcY0
-		//						(GLint)w,                        // srcX1
-		//						(GLint)h,                        // srcY1
-		//						(GLint)0,                        // dstX0
-		//						(GLint)0,                        // dstY0
-		//						(GLint)w / 2,                    // dstX1
-		//						(GLint)h / 2,                    // dstY1
-		//						(GLbitfield)GL_COLOR_BUFFER_BIT, // mask
-		//						(GLenum)GL_LINEAR);              // filter
+		glBlitNamedFramebuffer((GLuint)framebuffer,             // readFramebuffer
+								(GLuint)0,                       // backbuffer     // drawFramebuffer
+								(GLint)0,                        // srcX0
+								(GLint)0,                        // srcY0
+								(GLint)w,                        // srcX1
+								(GLint)h,                        // srcY1
+								(GLint)0,                        // dstX0
+								(GLint)0,                        // dstY0
+								(GLint)w / 2,                    // dstX1
+								(GLint)h / 2,                    // dstY1
+								(GLbitfield)GL_COLOR_BUFFER_BIT, // mask
+								(GLenum)GL_LINEAR);              // filter
 
 		SDL_GL_SwapWindow(desktop_window);
 	}
